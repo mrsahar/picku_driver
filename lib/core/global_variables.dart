@@ -9,23 +9,28 @@ class GlobalVariables extends GetxController {
   // Reactive variables
   final RxString _userToken = ''.obs;
   final RxBool _isLoggedIn = false.obs;
-  final RxString _baseUrl = 'https://jsonplaceholder.typicode.com'.obs;
+  final RxString _baseUrl = 'http://sahilsally9-001-site1.qtempurl.com'.obs;
   final RxBool _isLoading = false.obs;
+  final RxString _userEmail = ''.obs;
 
   // Getters
   String get userToken => _userToken.value;
   bool get isLoggedIn => _isLoggedIn.value;
   String get baseUrl => _baseUrl.value;
   bool get isLoading => _isLoading.value;
+  String get userEmail => _userEmail.value;
+
+  RxString get userEmailRx => _userEmail;
 
   @override
   void onInit() {
     super.onInit();
     _loadStoredData();
   }
-
+  void setUserEmail(String email) { // ✅ Added email setter
+    _userEmail.value = email;
+  }
   void _loadStoredData() {
-
   }
 
   // Setters
@@ -48,5 +53,11 @@ class GlobalVariables extends GetxController {
   void clearUserData() {
     _userToken.value = '';
     _isLoggedIn.value = false;
+
+  }
+  bool get hasUserEmail => _userEmail.value.isNotEmpty;
+
+  void logout() {
+    clearUserData();
   }
 }

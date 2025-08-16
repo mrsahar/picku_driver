@@ -1,6 +1,6 @@
 // lib/app/core/constants/app_constants.dart
 class AppConstants {
-  static const String API_BASE_URL = 'https://jsonplaceholder.typicode.com';
+  static const String API_BASE_URL = 'http://sahilsally9-001-site1.qtempurl.com';
 
   // API Endpoints
   static const String USERS_ENDPOINT = '/users';

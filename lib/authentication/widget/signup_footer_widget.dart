@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
+import 'package:pick_u_driver/routes/app_routes.dart';
 
 class SignUpFooterWidget extends StatelessWidget {
   const SignUpFooterWidget({
@@ -20,7 +23,9 @@ class SignUpFooterWidget extends StatelessWidget {
           ),
         ),
         TextButton(
-          onPressed: () {},
+          onPressed: () {
+            Get.toNamed(AppRoutes.LOGIN_SCREEN);
+          },
           child: Text.rich(TextSpan(children: [
             TextSpan(
               text: "Already Have AnAccount? ",

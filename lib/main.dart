@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:get/get.dart';
+import 'package:pick_u_driver/bindings/initial_binding.dart';
 import 'package:pick_u_driver/routes/app_pages.dart';
 import 'package:pick_u_driver/screens/splash_screen.dart';
 import 'package:pick_u_driver/utils/theme/app_theme.dart';
@@ -39,11 +40,13 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       title: 'PickU Driver',
       theme: MAppTheme.lightTheme,
-      darkTheme:MAppTheme.darkTheme,
+      darkTheme: MAppTheme.darkTheme,
       themeMode: ThemeMode.system,
-      initialRoute: AppPages.INITIAL,
-      getPages: AppPages.routes,
-      home: SplashScreen(),
+      initialBinding: InitialBinding(),
+      navigatorObservers: [AppPages.routeObserver],
+      initialRoute: AppPages.INITIAL, // Keep this
+      getPages: AppPages.routes,      // Keep this
+      // Remove the home property completely
     );
   }
 }

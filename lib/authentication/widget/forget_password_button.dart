@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class ForgetPasswordBtnWidget extends StatelessWidget {
-  const ForgetPasswordBtnWidget({
+class ForgotPasswordBtnWidget extends StatelessWidget {
+  const ForgotPasswordBtnWidget({
     required this.btnIcon,
     required this.title,
     required this.subTitle,

@@ -1,9 +1,7 @@
-import 'package:fl_country_code_picker/fl_country_code_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
-import '../otp_screen.dart';
-import '../reset_password_screen.dart';
+import 'package:pick_u_driver/controllers/login_controller.dart';
+import 'package:pick_u_driver/routes/app_routes.dart';
 
 class LoginForm extends StatefulWidget {
   const LoginForm({
@@ -15,22 +13,12 @@ class LoginForm extends StatefulWidget {
 }
 
 class _LoginFormState extends State<LoginForm> {
-  FlCountryCodePicker countryCodePicker = const FlCountryCodePicker();
-  TextEditingController txtMobile = TextEditingController();
-
-  late CountryCode countryCode;
-  @override
-  void initState() {
-    super.initState();
-
-    countryCode = countryCodePicker.countryCodes
-        .firstWhere((element) => element.name == "Pakistan");
-  }
-
   @override
   Widget build(BuildContext context) {
+    final controller = Get.find<LoginController>();
 
     return Form(
+      key: controller.formKey,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20 - 10),
         child: Column(
@@ -39,88 +27,69 @@ class _LoginFormState extends State<LoginForm> {
             const SizedBox(
               height: 25,
             ),
-            InkWell(
-              onTap: () async {
-                final code = await countryCodePicker.showPicker(
-                    context: context);
 
-                if (code != null) {
-                  countryCode = code;
-                  setState(() {});
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 15),
-                width: double.maxFinite,
-                height: 60,
-                decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceBright,
-                    borderRadius: BorderRadius.circular(5),
-                    border: Border.all(width: 1),
-                    boxShadow: const [
-                      BoxShadow(
-                          color: Colors.black12, blurRadius: .2)
-                    ]),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 50,
-                      height: 30,
-                      child: ClipRRect(
-                          borderRadius: BorderRadius.circular(5),
-                          child: countryCode.flagImage(
-                            fit: BoxFit.cover,
-                          )),
-                    ),
-                    const SizedBox(width: 10,),
-                    Expanded(
-                      child: Text(
-                        "${countryCode.name.toUpperCase()} ( ${countryCode.dialCode} )",
-                        textAlign: TextAlign.left,
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(
-              height: 15,
-            ),
-            const SizedBox(height: 30 - 20),
+            // Email Input Field
             TextFormField(
-              keyboardType : TextInputType.number,
+              controller: controller.emailController,
+              validator: controller.validateEmail,
+              keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.fingerprint),
-                labelText: "Enter Mobile Number",
-                hintText: "Number",
+                prefixIcon: Icon(Icons.email),
+                labelText: "Enter Email Address",
+                hintText: "Email",
                 border: OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  onPressed: null,
-                  icon: Icon(Icons.remove_red_eye_sharp),
-                ),
               ),
             ),
+
+            const SizedBox(height: 15),
+
+            // Password Input Field
+            Obx(() => TextFormField(
+              controller: controller.passwordController,
+              validator: controller.validatePassword,
+              obscureText: !controller.isPasswordVisible.value,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.lock),
+                labelText: "Enter Password",
+                hintText: "Password",
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  onPressed: controller.togglePasswordVisibility,
+                  icon: Icon(
+                    controller.isPasswordVisible.value
+                        ? Icons.visibility
+                        : Icons.visibility_off,
+                  ),
+                ),
+              ),
+            )),
+
             const SizedBox(height: 30 - 20),
+
+            // Forgot Password Button (connected to controller)
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
                   onPressed: () {
-                    Get.to(() => const ResetPasswordScreen());
-                  }, child: const Text("Forget Password?")),
+                    Get.toNamed(AppRoutes.FORGOT_PASSWORD_SCREEN);
+                  },
+                  child: const Text("Forgot Password?")),
             ),
-            SizedBox(
+
+            // Login Button (connected to controller with loading state)
+            Obx(() => SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  Get.to(() => const OTPScreen());
+                onPressed: controller.isLoading.value
+                    ? null
+                    : () {
+                  controller.login(context);
                 },
-                child: Text("Login".toUpperCase()),
+                child: controller.isLoading.value
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text("Login".toUpperCase()),
               ),
-            ),
+            )),
           ],
         ),
       ),

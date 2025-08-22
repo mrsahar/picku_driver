@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pick_u_driver/core/global_variables.dart';
+import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/providers/api_provider.dart';
 import '../models/login_model.dart';
 import '../routes/app_routes.dart';
@@ -77,11 +78,9 @@ class LoginController extends GetxController {
 
   // Login method - use Form validation instead of manual validation
   Future<void> login(BuildContext context) async {
-    // Use formKey.currentState!.validate() instead of manual validation
     if (!formKey.currentState!.validate()) {
-      return; // Form validation will show error messages automatically
+      return;
     }
-
     try {
       isLoading.value = true;
 
@@ -100,7 +99,12 @@ class LoginController extends GetxController {
         globalVars.setUserEmail(emailController.text.trim());
         globalVars.setLoginStatus(true);
 
-        // If API returns token, save it
+        // Save data to SharedPreferences using your service
+        if (response.data != null) {
+          await SharedPrefsService.saveUserDataFromResponse(response.data);
+        }
+
+        // If API returns token, save it in GlobalVariables too
         if (response.data != null && response.data['token'] != null) {
           globalVars.setUserToken(response.data['token']);
         }
@@ -117,7 +121,7 @@ class LoginController extends GetxController {
         );
 
         // Navigate to Dashboard or Home screen
-        Get.offAllNamed(AppRoutes.MainMap);
+        Get.offAllNamed(AppRoutes.shiftApplication);
       } else {
         Get.snackbar(
           'Error',

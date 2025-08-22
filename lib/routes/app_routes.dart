@@ -7,4 +7,9 @@ abstract class AppRoutes {
   static const MainMap = '/mainmap';
   static const FORGOT_PASSWORD_SCREEN = '/forgot-password';
   static const Reset_Password = '/reset-password';
+
+
+  // Shift Management Routes
+  static const String shiftApplication = '/shift-application';
+
 }

@@ -10,7 +10,7 @@ class MAppTheme {
   static const Color backgroundWhite = Color(0xFFFFFFFF);
 
   // Additional colors for better theming
-  static const Color lightGrey = Color(0xFFF5F5F5);
+  static const Color lightGrey = Color(0xFFFfFfFf);
   static const Color darkGrey = Color(0xFF2C2C2C);
 
   static ThemeData lightTheme = ThemeData(

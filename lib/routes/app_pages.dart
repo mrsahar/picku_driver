@@ -8,15 +8,17 @@ import 'package:pick_u_driver/bindings/forgot_password_binding.dart';
 import 'package:pick_u_driver/bindings/login_binding.dart';
 import 'package:pick_u_driver/bindings/otp_binding.dart';
 import 'package:pick_u_driver/bindings/reset_password_binding.dart';
+import 'package:pick_u_driver/bindings/shift_application_binding.dart';
 import 'package:pick_u_driver/bindings/signup_binding.dart';
 import 'package:pick_u_driver/routes/app_route_observer.dart';
 import 'package:pick_u_driver/static_screen/main_map.dart';
+import 'package:pick_u_driver/static_screen/shift_time.dart';
 import 'app_routes.dart';
 
 class AppPages {
   AppPages._();
 
-  static const INITIAL = AppRoutes.SIGNUP_SCREEN;
+  static const INITIAL = AppRoutes.shiftApplication;
 
   // Observer instance
   static final MyRouteObserver routeObserver = MyRouteObserver();
@@ -51,6 +53,14 @@ class AppPages {
       name: AppRoutes.Reset_Password,
       page: () => const ResetPasswordScreen(),
       binding: ResetPasswordBinding(),
+    ),
+
+    GetPage(
+      name: AppRoutes.shiftApplication,
+      page: () => ShiftApplicationPage(),
+      binding: ShiftApplicationBinding(),
+      transition: Transition.rightToLeft,
+      transitionDuration: Duration(milliseconds: 300),
     ),
 
   ];

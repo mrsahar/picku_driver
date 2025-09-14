@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
 import 'package:pick_u_driver/authentication/widget/login_footer_widget.dart';
 import 'package:pick_u_driver/authentication/widget/login_form.dart';
 import 'package:pick_u_driver/authentication/widget/login_header_widget.dart';
-
-import '../routes/app_routes.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

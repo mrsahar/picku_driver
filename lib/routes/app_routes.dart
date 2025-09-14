@@ -12,4 +12,21 @@ abstract class AppRoutes {
   // Shift Management Routes
   static const String shiftApplication = '/shift-application';
 
-}
+  // Profile Routes
+  static const String driverProfile = '/driver-profile';
+  static const String mainMap = '/main';
+
+  static const rideHistory = '/rideHistory';
+  static const scheduledRideHistory = '/scheduledRideHistory';
+  static const String profileScreen = '/profileScreen';
+  static const editProfile = '/editProfile';
+  static const String chatScreen = '/chatScreen';
+
+  //Extra
+  static const notificationScreen = '/notification';
+  static const settingsScreen = '/settingsScreen';
+  static const helpCenterScreen = '/helpCenter';
+  static const String privacyPolicy = '/privacyPolicy';
+
+
+  }

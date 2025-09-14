@@ -3,7 +3,6 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:get/get.dart';
 import 'package:pick_u_driver/bindings/initial_binding.dart';
 import 'package:pick_u_driver/routes/app_pages.dart';
-import 'package:pick_u_driver/screens/splash_screen.dart';
 import 'package:pick_u_driver/utils/theme/app_theme.dart';
 
 import 'core/global_variables.dart';

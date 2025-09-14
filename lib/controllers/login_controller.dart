@@ -121,7 +121,7 @@ class LoginController extends GetxController {
         );
 
         // Navigate to Dashboard or Home screen
-        Get.offAllNamed(AppRoutes.shiftApplication);
+        Get.offAllNamed(AppRoutes.mainMap);
       } else {
         Get.snackbar(
           'Error',

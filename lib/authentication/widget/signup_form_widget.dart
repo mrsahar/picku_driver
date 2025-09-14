@@ -10,7 +10,7 @@ class SignUpFormWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<SignUpController>();
+    final controller = Get.put(SignUpController());
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),

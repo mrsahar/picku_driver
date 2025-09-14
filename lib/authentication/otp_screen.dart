@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_otp_text_field/flutter_otp_text_field.dart';
 import 'package:get/get.dart';
-import 'package:pick_u_driver/screens/verify_message_screen.dart';
 
-// authentication/otp_screen.dart
-import 'package:flutter/material.dart';
-import 'package:get/get.dart'; // Make sure you have this package
 import '../controllers/otp_controller.dart';
 
 class OTPScreen extends StatelessWidget {

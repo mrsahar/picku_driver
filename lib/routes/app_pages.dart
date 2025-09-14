@@ -1,9 +1,11 @@
 import 'package:get/get.dart';
+import 'package:pick_u_driver/authentication/driver_profile_page.dart';
 import 'package:pick_u_driver/authentication/forget_password_screen.dart';
 import 'package:pick_u_driver/authentication/login_screen.dart';
 import 'package:pick_u_driver/authentication/otp_screen.dart';
 import 'package:pick_u_driver/authentication/reset_password_screen.dart';
 import 'package:pick_u_driver/authentication/signup_screen.dart';
+import 'package:pick_u_driver/bindings/driver_profile_binding.dart';
 import 'package:pick_u_driver/bindings/forgot_password_binding.dart';
 import 'package:pick_u_driver/bindings/login_binding.dart';
 import 'package:pick_u_driver/bindings/otp_binding.dart';
@@ -11,14 +13,35 @@ import 'package:pick_u_driver/bindings/reset_password_binding.dart';
 import 'package:pick_u_driver/bindings/shift_application_binding.dart';
 import 'package:pick_u_driver/bindings/signup_binding.dart';
 import 'package:pick_u_driver/routes/app_route_observer.dart';
-import 'package:pick_u_driver/static_screen/main_map.dart';
-import 'package:pick_u_driver/static_screen/shift_time.dart';
-import 'app_routes.dart';
+import 'package:pick_u_driver/driver_screen/main_map.dart';
+import 'package:pick_u_driver/driver_screen/shift_time.dart';
+import 'app_routes.dart'; 
+import 'package:pick_u_driver/authentication/edit_profile_screen.dart'; 
+import 'package:pick_u_driver/authentication/profile_screen.dart'; 
+import 'package:pick_u_driver/bindings/chat_binding.dart';
+import 'package:pick_u_driver/bindings/edit_profile_binding.dart';
+import 'package:pick_u_driver/bindings/forgot_password_binding.dart';
+import 'package:pick_u_driver/bindings/login_binding.dart';
+import 'package:pick_u_driver/bindings/otp_binding.dart';
+import 'package:pick_u_driver/bindings/profile_binding.dart';
+import 'package:pick_u_driver/bindings/reset_password_binding.dart';
+import 'package:pick_u_driver/bindings/ride_history_binding.dart';
+import 'package:pick_u_driver/bindings/scheduled_ride_history_binding.dart';
+import 'package:pick_u_driver/bindings/signup_binding.dart';
+import 'package:pick_u_driver/routes/app_route_observer.dart';
+import 'package:pick_u_driver/driver_screen/chat_screen.dart';
+import 'package:pick_u_driver/driver_screen/history/history_screen.dart';
+import 'package:pick_u_driver/driver_screen/main_map.dart';
+import 'package:pick_u_driver/driver_screen/scheduled/scheduled_ride_history_page.dart';
+import 'package:pick_u_driver/driver_screen/screens/help_center_screen.dart';
+import 'package:pick_u_driver/driver_screen/screens/notification_screen.dart';
+import 'package:pick_u_driver/driver_screen/screens/privacy_policy_screen.dart';
+import 'package:pick_u_driver/driver_screen/screens/setting_screen.dart';
 
 class AppPages {
   AppPages._();
 
-  static const INITIAL = AppRoutes.shiftApplication;
+  static const INITIAL = AppRoutes.LOGIN_SCREEN;
 
   // Observer instance
   static final MyRouteObserver routeObserver = MyRouteObserver();
@@ -55,6 +78,7 @@ class AppPages {
       binding: ResetPasswordBinding(),
     ),
 
+// Driver Profile Routes
     GetPage(
       name: AppRoutes.shiftApplication,
       page: () => ShiftApplicationPage(),
@@ -62,6 +86,50 @@ class AppPages {
       transition: Transition.rightToLeft,
       transitionDuration: Duration(milliseconds: 300),
     ),
+    GetPage(
+      name: AppRoutes.driverProfile,
+      page: () => DriverProfilePage(),
+      binding: DriverProfileBinding(),
+      transition: Transition.rightToLeft,
+      transitionDuration: Duration(milliseconds: 300),
+    ),
+    GetPage(
+      name: AppRoutes.mainMap,
+      page: () => const MainMap(),
+    ),
+    GetPage(
+      name: AppRoutes.rideHistory,
+      page: () => const RideHistoryPage(),
+      binding: RideHistoryBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.scheduledRideHistory,
+      page: () => const ScheduledRideHistoryPage(),
+      binding: ScheduledRideHistoryBinding(),
+    ),
 
+    // Extra
+    GetPage(
+      name: AppRoutes.notificationScreen,
+      page: () => const NotificationScreen(),
+    ),
+    GetPage(
+      name: AppRoutes.settingsScreen,
+      page: () => const SettingsScreen(),
+    ),
+    GetPage(
+      name: AppRoutes.helpCenterScreen,
+      page: () => const HelpCenterScreen(),
+    ),
+    GetPage(
+      name: AppRoutes.privacyPolicy,
+      page: () => const PrivacyPolicyScreen(),
+    ),
+    GetPage(
+      name: AppRoutes.chatScreen,
+      page: () => const ChatScreen(),
+      binding: ChatBinding(),
+      transitionDuration: const Duration(milliseconds: 300),
+    )
   ];
 }

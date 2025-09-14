@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:get/get_utils/get_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
-import 'package:pick_u_driver/static_screen/new_user/new_profile_screen.dart';
+import 'package:pick_u_driver/driver_screen/new_user/new_profile_screen.dart';
 
 class VerifyMessageScreen extends StatefulWidget {
   const VerifyMessageScreen({super.key});

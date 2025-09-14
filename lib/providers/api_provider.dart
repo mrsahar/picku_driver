@@ -63,9 +63,46 @@ class ApiProvider extends GetConnect {
       );
     }
   }
+  // POST Request - handles both JSON and FormData
+  Future<Response> postData2(String endpoint, dynamic data) async {
+    try {
+      _globalVars.setLoading(true);
+      print(' SAHArSAHAr MRSAHAr: POST $endpoint');
+
+      Response response;
+      if (data is FormData) {
+        // For FormData, don't use the interceptor - send directly
+        final headers = <String, String>{};
+        if (_globalVars.userToken.isNotEmpty) {
+          headers['Authorization'] = 'Bearer ${_globalVars.userToken}';
+        }
+        // Don't set Content-Type - let it be set automatically for multipart
+
+        response = await httpClient.post(
+          endpoint,
+          body: data,
+          headers: headers,
+        );
+      } else {
+        // Use regular post for JSON data
+        response = await post(endpoint, data);
+      }
+
+      print(' SAHArSAHAr MRSAHAr: POST Response = ${response.bodyString}');
+      _globalVars.setLoading(false);
+      return response;
+    } catch (e) {
+      _globalVars.setLoading(false);
+      print(' SAHArSAHAr MRSAHAr: Exception during POST request: $e');
+      return Response(
+        statusCode: 500,
+        statusText: 'Network Error: $e',
+      );
+    }
+  }
 
   // PUT Request
-  Future<Response> putData(String endpoint, Map<String, dynamic> data) async {
+  Future<Response> putData(String endpoint, Map<String, String> data) async {
     try {
       _globalVars.setLoading(true);
       final response = await put(endpoint, data);

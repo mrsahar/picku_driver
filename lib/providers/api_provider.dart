@@ -133,7 +133,7 @@ class ApiProvider extends GetConnect {
     }
   }
 
-  // Replace your signUp method with this robust version
+  // User Authentication APIs - SignUp, Login, OTP Verification, Forgot Password, Reset Password
   Future<SignUpResponse> signUp(SignUpRequest request) async {
     try {
       print('🚀 MRSAHAr ApiProvider: Starting signUp request');

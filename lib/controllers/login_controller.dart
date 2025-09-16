@@ -31,6 +31,8 @@ class LoginController extends GetxController {
     passwordController = TextEditingController();
     // Initialize API provider
     _apiProvider = Get.find<ApiProvider>();
+
+    checkAuthenticationStatus();
   }
 
   @override
@@ -69,77 +71,204 @@ class LoginController extends GetxController {
 
   // Get device token
   String getDeviceToken() {
-    // For now, return a placeholder. You should implement:
-    // - Firebase FCM token
-    // - Device ID
-    // - Or any unique device identifier
     return "deviceToken_placeholder_${DateTime.now().millisecondsSinceEpoch}";
   }
 
-  // Login method - use Form validation instead of manual validation
+  // Updated Login method with SharedPrefsService integration
   Future<void> login(BuildContext context) async {
+    // Use formKey.currentState!.validate() instead of manual validation
     if (!formKey.currentState!.validate()) {
-      return;
+      return; // Form validation will show error messages automatically
     }
+
     try {
       isLoading.value = true;
 
       final loginRequest = LoginRequest(
         email: emailController.text.trim(),
         password: passwordController.text,
-        deviceToken: getDeviceToken(),
+        deviceToken:'',
       );
 
-      print('📤 Login: Sending request for email: ${emailController.text}');
+      print(' SAHArSAHAr 📤 Login: Sending request for email: ${emailController.text}');
       final response = await _apiProvider.login(loginRequest);
 
-      if (response.success) {
-        // Save user data in GlobalVariables
-        final globalVars = GlobalVariables.instance;
-        globalVars.setUserEmail(emailController.text.trim());
-        globalVars.setLoginStatus(true);
+      if (response.success && response.data != null) {
+        // Check if the message is "Login successful"
+        final message = response.data['message'] ?? response.message;
 
-        // Save data to SharedPreferences using your service
-        if (response.data != null) {
+        if (message == "Login successful") {
           await SharedPrefsService.saveUserDataFromResponse(response.data);
-        }
 
-        // If API returns token, save it in GlobalVariables too
-        if (response.data != null && response.data['token'] != null) {
+          final globalVars = GlobalVariables.instance;
+          globalVars.setUserEmail(response.data['email'] ?? emailController.text.trim());
+          globalVars.setLoginStatus(true);
           globalVars.setUserToken(response.data['token']);
+
+          // Clear form on success
+          clearForm();
+
+          // Show success message
+          Get.snackbar(
+            'Success',
+            message,
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+            snackPosition: SnackPosition.TOP,
+            duration: const Duration(seconds: 2),
+          );
+
+          // Navigate to MainMap
+          Get.offAllNamed(AppRoutes.MainMap);
+        } else {
+          // Show the message from API response
+          Get.snackbar(
+            'Error',
+            message,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+            snackPosition: SnackPosition.TOP,
+            duration: const Duration(seconds: 3),
+          );
         }
-
-        // Clear form on success
-        clearForm();
-
-        Get.snackbar(
-          'Success',
-          response.message,
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-          snackPosition: SnackPosition.TOP,
-        );
-
-        // Navigate to Dashboard or Home screen
-        Get.offAllNamed(AppRoutes.mainMap);
       } else {
+        // Handle API error response
         Get.snackbar(
           'Error',
           response.message,
           backgroundColor: Colors.red,
           colorText: Colors.white,
           snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 3),
         );
       }
     } catch (e) {
-      print('💥 Login: Error: $e');
+      print(' SAHArSAHAr 💥 Login: Error: $e');
       Get.snackbar(
         'Error',
         'Failed to login. Please try again.',
         backgroundColor: Colors.red,
         colorText: Colors.white,
         snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 3),
       );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // Enhanced method to check authentication status with token validation
+  Future<void> checkAuthenticationStatus() async {
+    try {
+      print(' SAHArSAHAr 🔍 Checking authentication status...');
+
+      // Get user data from SharedPreferences
+      final userData = await SharedPrefsService.getUserData();
+      final token = userData['token'];
+      final expiresStr = userData['expires'];
+      final isLoggedIn = userData['isLoggedIn'];
+
+      print(' SAHArSAHAr 📱 Token exists: ${token != null}');
+      print(' SAHArSAHAr 📱 Is logged in: $isLoggedIn');
+      print(' SAHArSAHAr 📱 Expires: $expiresStr');
+
+      // Check if user has login data
+      if (token != null && token.isNotEmpty && isLoggedIn == 'true') {
+        print(' SAHArSAHAr ✅ User has login data, checking token expiry...');
+
+        // Check if token is expired
+        final isTokenExpired = await SharedPrefsService.isTokenExpired();
+        final now = DateTime.now();
+
+        if (expiresStr != null) {
+          try {
+            final expiryDate = DateTime.parse(expiresStr);
+            print(' SAHArSAHAr ⏰ Token expires at: $expiryDate');
+            print(' SAHArSAHAr ⏰ Current time: $now');
+            print(' SAHArSAHAr ⏰ Token expired: $isTokenExpired');
+
+            if (!isTokenExpired && now.isBefore(expiryDate)) {
+              // Token is valid, navigate to MainMap
+              print(' SAHArSAHAr 🚀 Token is valid, navigating to MainMap');
+
+              // Update GlobalVariables for consistency
+              final globalVars = GlobalVariables.instance;
+              globalVars.setUserToken(token);
+              globalVars.setUserEmail(userData['email'] ?? '');
+              globalVars.setLoginStatus(true);
+
+              // Navigate to MainMap
+              Get.offAllNamed(AppRoutes.MainMap);
+              return;
+            }
+          } catch (e) {
+            print(' SAHArSAHAr 💥 Error parsing expiry date: $e');
+          }
+        }
+
+        // Token is expired or invalid
+        print(' SAHArSAHAr ❌ Token expired or invalid, clearing data and staying on login');
+        await SharedPrefsService.clearUserData();
+
+        // Clear GlobalVariables
+        final globalVars = GlobalVariables.instance;
+        globalVars.setLoginStatus(false);
+        globalVars.setUserToken('');
+        globalVars.setUserEmail('');
+
+        // Show session expired message
+        Get.snackbar(
+          'Session Expired',
+          'Your session has expired. Please login again.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 3),
+        );
+      } else {
+        print(' SAHArSAHAr ❌ No valid login data found, staying on login screen');
+      }
+    } catch (e) {
+      print(' SAHArSAHAr 💥 Error checking authentication status: $e');
+      // On error, clear any corrupted data and stay on login screen
+      await SharedPrefsService.clearUserData();
+    }
+  }
+
+  // Method to manually check login status (for backward compatibility)
+  Future<void> checkLoginStatus() async {
+    await checkAuthenticationStatus();
+  }
+
+  // Method to logout user
+  Future<void> logout() async {
+    try {
+      isLoading.value = true;
+
+      // Clear SharedPreferences
+      await SharedPrefsService.clearUserData();
+
+      // Clear GlobalVariables
+      final globalVars = GlobalVariables.instance;
+      globalVars.setLoginStatus(false);
+      globalVars.setUserToken('');
+      globalVars.setUserEmail('');
+
+      // Clear form
+      clearForm();
+
+      // Navigate to login screen
+      Get.offAllNamed(AppRoutes.LOGIN_SCREEN);
+
+      Get.snackbar(
+        'Success',
+        'Logged out successfully',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.TOP,
+      );
+    } catch (e) {
+      print(' SAHArSAHAr 💥 Logout error: $e');
     } finally {
       isLoading.value = false;
     }
@@ -152,8 +281,6 @@ class LoginController extends GetxController {
     isPasswordVisible.value = false;
   }
 }
-
-// Updated LoginBinding to ensure proper initialization
 class LoginBinding extends Bindings {
   @override
   void dependencies() {

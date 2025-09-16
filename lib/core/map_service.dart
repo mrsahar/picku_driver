@@ -17,7 +17,7 @@ class MapService extends GetxService {
   var isLoadingRoute = false.obs;
   var routeDistance = ''.obs;
   var routeDuration = ''.obs;
-  List<LatLng> _interpolationPoints = [];
+  final List<LatLng> _interpolationPoints = [];
   int _interpolationIndex = 0;
 
   GoogleMapController? mapController;
@@ -320,7 +320,7 @@ class MapService extends GetxService {
         double finalBearing = _getBearingForLocation(toLocation);
         _createDriverMarkerWithRotation(toLocation, driverName, finalBearing);
 
-        print(' SAHArSAHAR Ultra-smooth driver animation completed');
+        print(' SAHAr Ultra-smooth driver animation completed');
       }
     });
   }
@@ -424,52 +424,6 @@ class MapService extends GetxService {
     }
 
     return _calculateBearingBetweenPoints(currentPoint, targetPoint);
-  }
-
-  /// Start smooth animation for driver marker with route-following rotation
-  void _startDriverAnimationWithRouteFollowing(LatLng fromLocation, LatLng toLocation, String driverName) {
-    if (_animationTimer?.isActive ?? false) {
-      _animationTimer?.cancel();
-    }
-
-    _isAnimating = true;
-    _currentAnimationStep = 0;
-
-    _animationTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      _currentAnimationStep++;
-
-      // Calculate progress (0.0 to 1.0)
-      double progress = _currentAnimationStep / _animationSteps;
-
-      // Use easing function for smoother animation
-      double easedProgress = _easeInOutCubic(progress);
-
-      // Interpolate position
-      double lat = fromLocation.latitude +
-          (toLocation.latitude - fromLocation.latitude) * easedProgress;
-      double lng = fromLocation.longitude +
-          (toLocation.longitude - fromLocation.longitude) * easedProgress;
-
-      LatLng currentPosition = LatLng(lat, lng);
-
-      // Calculate bearing based on route polyline, not straight line
-      double bearing = _getBearingForLocation(currentPosition);
-
-      // Create animated marker with route-based rotation
-      _createDriverMarkerWithRotation(currentPosition, driverName, bearing);
-
-      // Animation complete
-      if (_currentAnimationStep >= _animationSteps) {
-        timer.cancel();
-        _isAnimating = false;
-
-        // Ensure final position uses accurate road bearing
-        double finalBearing = _getBearingForLocation(toLocation);
-        _createDriverMarkerWithRotation(toLocation, driverName, finalBearing);
-
-        print(' SAHArSAHAr Driver animation completed with road-following rotation');
-      }
-    });
   }
 
   /// Calculate bearing between two points (corrected formula)

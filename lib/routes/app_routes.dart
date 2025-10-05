@@ -4,6 +4,7 @@ abstract class AppRoutes {
   static const SIGNUP_SCREEN = '/signup';
   static const OTP_SCREEN = '/otp';
   static const LOGIN_SCREEN = '/login';
+  static const WelcomeScreen = '/welcome_screen';
   static const MainMap = '/mainmap';
   static const FORGOT_PASSWORD_SCREEN = '/forgot-password';
   static const Reset_Password = '/reset-password';
@@ -27,6 +28,10 @@ abstract class AppRoutes {
   static const settingsScreen = '/settingsScreen';
   static const helpCenterScreen = '/helpCenter';
   static const String privacyPolicy = '/privacyPolicy';
+
+  //verification pages of driver documents
+  static const DRIVER_DOCUMENTS = '/driver-documents';
+  static const VERIFY_MESSAGE = '/verify-message';
 
 
   }

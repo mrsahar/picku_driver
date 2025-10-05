@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import 'package:pick_u_driver/driver_screen/request/required_documents.dart';
 
 class ProfileForm extends StatelessWidget {
   const ProfileForm({super.key});
@@ -146,7 +145,7 @@ class ProfileForm extends StatelessWidget {
           child: ElevatedButton(
             onPressed: () {
               // Handle continue
-              Get.to(() => const RequiredDocuments());
+              //Get.to(() => const RequiredDocuments());
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: colorScheme.primary,

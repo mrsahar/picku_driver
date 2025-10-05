@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:pick_u_driver/driver_screen/car_doc_screen.dart';
+import 'package:pick_u_driver/driver_screen/not_working/car_doc_screen.dart';
 import 'package:pick_u_driver/driver_screen/main_map.dart';
-import 'package:pick_u_driver/driver_screen/request/bank_account_detail_screen.dart';
-import 'package:pick_u_driver/driver_screen/request/driving_license_upload_page.dart';
-import 'package:pick_u_driver/driver_screen/request/profile_picture_screen.dart';
 import 'package:pick_u_driver/driver_screen/widget/submit_screen.dart';
 
 class RequiredDocuments extends StatelessWidget {
@@ -48,7 +45,7 @@ class RequiredDocuments extends StatelessWidget {
               title: 'Profile Picture',
               onTap: () {
                 // Navigate to Profile Picture Page
-                Get.to(() => const ProfilePictureScreen());
+               // Get.to(() => const ProfilePictureScreen());
               },
             ),
             _buildListTile(
@@ -56,7 +53,7 @@ class RequiredDocuments extends StatelessWidget {
               title: 'Bank Account Details',
               onTap: () {
                 // Navigate to Bank Account Page
-                Get.to(() => const BankAccountDetailsScreen());
+                //Get.to(() => const BankAccountDetailsScreen());
               },
             ),
             _buildListTile(
@@ -64,7 +61,7 @@ class RequiredDocuments extends StatelessWidget {
               title: 'Driving Details',
               onTap: () {
                 // Navigate to Driving Details Page
-                Get.to(() => const DrivingLicensePage());
+               // Get.to(() => const DrivingLicensePage());
               },
             ),
             _buildListTile(

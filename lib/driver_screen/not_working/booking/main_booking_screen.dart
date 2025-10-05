@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pick_u_driver/driver_screen/booking/active_booking_screen.dart';
-import 'package:pick_u_driver/driver_screen/booking/cancelled_booking_screen.dart';
-import 'package:pick_u_driver/driver_screen/booking/completed_bookings_screen.dart';
+import 'package:pick_u_driver/driver_screen/not_working/booking/active_booking_screen.dart';
+import 'package:pick_u_driver/driver_screen/not_working/booking/cancelled_booking_screen.dart';
+import 'package:pick_u_driver/driver_screen/not_working/booking/completed_bookings_screen.dart';
 
 class BookingsPage extends StatelessWidget {
   const BookingsPage({super.key});
@@ -42,7 +42,7 @@ class BookingsPage extends StatelessWidget {
             ],
           ),
         ),
-        body: const TabBarView(
+        body: TabBarView(
           children: [
             ActiveBookingsPage(),
             CompletedBookingsPage(),

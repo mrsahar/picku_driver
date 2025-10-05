@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:get/get.dart';
-import 'package:pick_u_driver/bindings/initial_binding.dart';
+import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:pick_u_driver/routes/app_pages.dart';
 import 'package:pick_u_driver/utils/theme/app_theme.dart';
+
+import 'bindings/initial_binding.dart';
+import 'driver_screen/shift_time.dart';
 
 Future<void> main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +30,6 @@ class _MyAppState extends State<MyApp> {
     await Future.delayed(const Duration(seconds: 3));
     FlutterNativeSplash.remove();
   }
-
 
   @override
   Widget build(BuildContext context) {

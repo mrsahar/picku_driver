@@ -5,6 +5,7 @@ import 'package:pick_u_driver/authentication/login_screen.dart';
 import 'package:pick_u_driver/authentication/otp_screen.dart';
 import 'package:pick_u_driver/authentication/reset_password_screen.dart';
 import 'package:pick_u_driver/authentication/signup_screen.dart';
+import 'package:pick_u_driver/bindings/driver_documents_binding.dart';
 import 'package:pick_u_driver/bindings/driver_profile_binding.dart';
 import 'package:pick_u_driver/bindings/forgot_password_binding.dart';
 import 'package:pick_u_driver/bindings/login_binding.dart';
@@ -12,10 +13,13 @@ import 'package:pick_u_driver/bindings/otp_binding.dart';
 import 'package:pick_u_driver/bindings/reset_password_binding.dart';
 import 'package:pick_u_driver/bindings/shift_application_binding.dart';
 import 'package:pick_u_driver/bindings/signup_binding.dart';
+import 'package:pick_u_driver/driver_screen/driver_documents_page.dart';
+import 'package:pick_u_driver/driver_screen/screens/verify_message_screen.dart';
 import 'package:pick_u_driver/routes/app_route_observer.dart';
 import 'package:pick_u_driver/driver_screen/main_map.dart';
 import 'package:pick_u_driver/driver_screen/shift_time.dart';
-import 'app_routes.dart'; 
+import '../driver_screen/screens/welcome_screen.dart';
+import 'app_routes.dart';
 import 'package:pick_u_driver/authentication/edit_profile_screen.dart'; 
 import 'package:pick_u_driver/authentication/profile_screen.dart'; 
 import 'package:pick_u_driver/bindings/chat_binding.dart';
@@ -41,12 +45,16 @@ import 'package:pick_u_driver/driver_screen/screens/setting_screen.dart';
 class AppPages {
   AppPages._();
 
-  static const INITIAL = AppRoutes.LOGIN_SCREEN;
+  static const INITIAL = AppRoutes.WelcomeScreen;
 
   // Observer instance
   static final MyRouteObserver routeObserver = MyRouteObserver();
 
   static final List<GetPage> routes = [
+    GetPage(
+      name: AppRoutes.WelcomeScreen,
+      page: () => const WelcomeScreen(),
+    ),
     GetPage(
       name: AppRoutes.SIGNUP_SCREEN,
       page: () => const SignupScreen(),
@@ -130,6 +138,17 @@ class AppPages {
       page: () => const ChatScreen(),
       binding: ChatBinding(),
       transitionDuration: const Duration(milliseconds: 300),
-    )
+    ),
+    GetPage(
+      name: AppRoutes.DRIVER_DOCUMENTS,
+      page: () => DriverDocumentsPage(),
+      binding: DriverDocumentsBinding(),
+    ),
+
+// If you don't have VerifyMessageScreen route yet, add it:
+    GetPage(
+      name: AppRoutes.VERIFY_MESSAGE,
+      page: () => VerifyMessageScreen(),
+    ),
   ];
 }

@@ -47,7 +47,7 @@ class DriverProfileController extends GetxController {
         _showErrorSnackbar('Driver ID not found. Please login again.');
       }
     } catch (e) {
-      print('MRSAHAr 💥 Error initializing profile: $e');
+      print(' SAHAr 💥 Error initializing profile: $e');
       _showErrorSnackbar('Error initializing profile');
     }
   }
@@ -56,19 +56,19 @@ class DriverProfileController extends GetxController {
   Future<void> fetchDriverProfile() async {
     try {
       isFetchingProfile.value = true;
-      print('MRSAHAr 📤 Fetching driver profile...');
+      print(' SAHAr 📤 Fetching driver profile...');
 
       final driverId = await SharedPrefsService.getUserId();
       if (driverId == null) {
-        print('MRSAHAr 💥 Driver ID not found');
+        print(' SAHAr 💥 Driver ID not found');
         return;
       }
 
       // Make API call to get existing profile (adjust endpoint as needed)
       final response = await _apiProvider.getData('/api/Drivers/profile/$driverId');
 
-      print('MRSAHAr 🔍 Profile Response Status: ${response.statusCode}');
-      print('MRSAHAr 🔍 Profile Response Body: ${response.body}');
+      print(' SAHAr 🔍 Profile Response Status: ${response.statusCode}');
+      print(' SAHAr 🔍 Profile Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final profileData = response.body;
@@ -76,15 +76,15 @@ class DriverProfileController extends GetxController {
         if (profileData != null) {
           driverProfile.value = DriverProfileModel.fromJson(profileData);
           _populateFormFields();
-          print('MRSAHAr ✅ Successfully fetched driver profile');
+          print(' SAHAr ✅ Successfully fetched driver profile');
         }
       } else if (response.statusCode == 404) {
-        print('MRSAHAr ℹ️ No existing profile found, will create new one');
+        print(' SAHAr ℹ️ No existing profile found, will create new one');
       } else {
-        print('MRSAHAr 💥 Error fetching profile: ${response.statusCode}');
+        print(' SAHAr 💥 Error fetching profile: ${response.statusCode}');
       }
     } catch (e) {
-      print('MRSAHAr 💥 Exception while fetching profile: $e');
+      print(' SAHAr 💥 Exception while fetching profile: $e');
       // Don't show error for fetching, as profile might not exist yet
     } finally {
       isFetchingProfile.value = false;
@@ -116,7 +116,7 @@ class DriverProfileController extends GetxController {
 
     try {
       isSubmitting.value = true;
-      print('MRSAHAr 📤 Updating driver profile...');
+      print(' SAHAr 📤 Updating driver profile...');
 
       final driverId = await SharedPrefsService.getUserId();
       if (driverId == null) {
@@ -138,20 +138,20 @@ class DriverProfileController extends GetxController {
         'sin': sinController.text.trim(),
       };
 
-      print('MRSAHAr 📤 Request data (Map<String, String>): $requestData');
+      print(' SAHAr 📤 Request data (Map<String, String>): $requestData');
 
       // Convert to JSON string for verification
       final jsonString = json.encode(requestData);
-      print('MRSAHAr 📤 JSON string: $jsonString');
+      print(' SAHAr 📤 JSON string: $jsonString');
 
       // Make API call to update profile
       final response = await _apiProvider.postData('/api/Drivers/update-profile', requestData);
 
-      print('MRSAHAr 🔍 Update Response Status: ${response.statusCode}');
-      print('MRSAHAr 🔍 Update Response Body: ${response.body}');
+      print(' SAHAr 🔍 Update Response Status: ${response.statusCode}');
+      print(' SAHAr 🔍 Update Response Body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        print('MRSAHAr ✅ Driver profile updated successfully');
+        print(' SAHAr ✅ Driver profile updated successfully');
         _showSuccessSnackbar('Profile updated successfully!');
         // // Update local profile data
         // driverProfile.value = DriverProfileModel(
@@ -180,7 +180,7 @@ class DriverProfileController extends GetxController {
       }
 
     } catch (e) {
-      print('MRSAHAr 💥 Exception while updating profile: $e');
+      print(' SAHAr 💥 Exception while updating profile: $e');
       _showErrorSnackbar('Failed to update profile. Please try again.');
     } finally {
       isSubmitting.value = false;

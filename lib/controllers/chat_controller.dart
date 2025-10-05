@@ -28,7 +28,7 @@ class ChatController extends GetxController {
   final RxString currentUserId = ''.obs;
 
   // Hub URL - adjust according to your backend
-  final String hubUrl = "http://sahilsally9-001-site1.qtempurl.com/ridechathub";
+  final String hubUrl = "http://pickurides.com/ridechathub";
 
   @override
   void onInit() {
@@ -50,7 +50,7 @@ class ChatController extends GetxController {
     // Get user ID asynchronously
     SharedPrefsService.getUserId().then((userId) {
       currentUserId.value = userId ?? '';
-      print(' SAHArSAHAr Current User ID loaded: ${currentUserId.value}');
+      print(' SAHAr Current User ID loaded: ${currentUserId.value}');
 
       // Load chat history after user ID is loaded and connection is ready
       if (isConnected.value) {
@@ -58,10 +58,10 @@ class ChatController extends GetxController {
       }
     });
 
-    print(' SAHArSAHAr ChatController initialized with:');
-    print(' SAHArSAHAr Ride ID: ${rideId.value}');
-    print(' SAHArSAHAr Driver ID: ${driverId.value}');
-    print(' SAHArSAHAr Driver Name: ${driverName.value}');
+    print(' SAHAr ChatController initialized with:');
+    print(' SAHAr Ride ID: ${rideId.value}');
+    print(' SAHAr Driver ID: ${driverId.value}');
+    print(' SAHAr Driver Name: ${driverName.value}');
   }
 
   Future<void> _initializeSignalR() async {
@@ -82,27 +82,27 @@ class ChatController extends GetxController {
 
       // Listen for chat history
       hubConnection?.on('ReceiveRideChatHistory', (List<Object?>? arguments) {
-        print(' SAHArSAHAr ReceiveRideChatHistory event triggered');
+        print(' SAHAr ReceiveRideChatHistory event triggered');
         if (arguments != null && arguments.isNotEmpty) {
           final historyData = arguments[0] as List<dynamic>;
-          print(' SAHArSAHAr Chat history data received: ${historyData.length} messages');
+          print(' SAHAr Chat history data received: ${historyData.length} messages');
           _handleChatHistory(historyData);
         }
       });
 
       // Handle connection events
       hubConnection?.onclose((error) {
-        print(' SAHArSAHAr SignalR connection closed: $error');
+        print(' SAHAr SignalR connection closed: $error');
         isConnected.value = false;
       });
 
       hubConnection?.onreconnecting((error) {
-        print(' SAHArSAHAr SignalR reconnecting: $error');
+        print(' SAHAr SignalR reconnecting: $error');
         isConnected.value = false;
       });
 
       hubConnection?.onreconnected((connectionId) {
-        print(' SAHArSAHAr SignalR reconnected: $connectionId');
+        print(' SAHAr SignalR reconnected: $connectionId');
         isConnected.value = true;
         _joinRideChat();
       });
@@ -110,7 +110,7 @@ class ChatController extends GetxController {
       // Start connection
       await hubConnection?.start();
       isConnected.value = true;
-      print(' SAHArSAHAr ✅ Connected to SignalR hub');
+      print(' SAHAr ✅ Connected to SignalR hub');
 
       // Join ride chat group
       await _joinRideChat();
@@ -121,7 +121,7 @@ class ChatController extends GetxController {
       }
 
     } catch (e) {
-      print(' SAHArSAHAr ❌ SignalR connection error: $e');
+      print(' SAHAr ❌ SignalR connection error: $e');
       Get.snackbar('Connection Error', 'Failed to connect to chat service');
     } finally {
       isLoading.value = false;
@@ -132,16 +132,16 @@ class ChatController extends GetxController {
     if (hubConnection != null && rideId.value.isNotEmpty) {
       try {
         await hubConnection?.invoke('JoinRideChat', args: [rideId.value]);
-        print(' SAHArSAHAr 📌 Joined ride chat for: ${rideId.value}');
+        print(' SAHAr 📌 Joined ride chat for: ${rideId.value}');
       } catch (e) {
-        print(' SAHArSAHAr ❌ Failed to join ride chat: $e');
+        print(' SAHAr ❌ Failed to join ride chat: $e');
       }
     }
   }
 
   void _handleReceivedMessage(Map<String, dynamic> messageData) {
     try {
-      print(' SAHArSAHAr Raw message data: $messageData');
+      print(' SAHAr Raw message data: $messageData');
       final chatMessage = ChatMessage.fromJson(messageData);
       final isFromCurrentUser = chatMessage.senderId == currentUserId.value;
 
@@ -162,43 +162,43 @@ class ChatController extends GetxController {
         }
       });
 
-      print(' SAHArSAHAr 📨 Received message: ${chatMessage.message}');
+      print(' SAHAr 📨 Received message: ${chatMessage.message}');
     } catch (e) {
-      print(' SAHArSAHAr ❌ Error handling received message: $e');
+      print(' SAHAr ❌ Error handling received message: $e');
     }
   }
 
   Future<void> _loadChatHistory() async {
     if (rideId.value.isEmpty) {
-      print(' SAHArSAHAr Cannot load chat history - empty ride ID');
+      print(' SAHAr Cannot load chat history - empty ride ID');
       return;
     }
 
     if (hubConnection == null || !isConnected.value) {
-      print(' SAHArSAHAr Cannot load chat history - not connected to SignalR');
+      print(' SAHAr Cannot load chat history - not connected to SignalR');
       return;
     }
 
     try {
       isLoadingMessages.value = true;
-      print(' SAHArSAHAr Loading chat history via SignalR for ride: ${rideId.value}');
+      print(' SAHAr Loading chat history via SignalR for ride: ${rideId.value}');
 
       // Request chat history via SignalR
       await hubConnection?.invoke('GetRideChatHistory', args: [rideId.value]);
-      print(' SAHArSAHAr Chat history request sent successfully via SignalR');
+      print(' SAHAr Chat history request sent successfully via SignalR');
 
     } catch (e) {
-      print(' SAHArSAHAr Failed to request chat history: $e');
+      print(' SAHAr Failed to request chat history: $e');
       isLoadingMessages.value = false;
     }
   }
 
   void _handleChatHistory(List<dynamic> chatHistory) {
     try {
-      print(' SAHArSAHAr Processing chat history: ${chatHistory.length} messages');
+      print(' SAHAr Processing chat history: ${chatHistory.length} messages');
 
       if (chatHistory.isEmpty) {
-        print(' SAHArSAHAr No chat history found');
+        print(' SAHAr No chat history found');
         messages.clear();
         isLoadingMessages.value = false;
         return;
@@ -208,13 +208,13 @@ class ChatController extends GetxController {
 
       for (var messageData in chatHistory) {
         try {
-          print(' SAHArSAHAr Processing message: $messageData');
+          print(' SAHAr Processing message: $messageData');
           final chatMessage = ChatMessage.fromJson(messageData);
           final isFromCurrentUser = chatMessage.senderId == currentUserId.value;
 
           loadedMessages.add(chatMessage.copyWith(isFromCurrentUser: isFromCurrentUser));
         } catch (e) {
-          print(' SAHArSAHAr Error processing individual message: $e');
+          print(' SAHAr Error processing individual message: $e');
         }
       }
 
@@ -231,9 +231,9 @@ class ChatController extends GetxController {
         }
       });
 
-      print(' SAHArSAHAr Loaded ${loadedMessages.length} messages via SignalR');
+      print(' SAHAr Loaded ${loadedMessages.length} messages via SignalR');
     } catch (e) {
-      print(' SAHArSAHAr Error handling chat history: $e');
+      print(' SAHAr Error handling chat history: $e');
     } finally {
       isLoadingMessages.value = false;
     }
@@ -259,9 +259,9 @@ class ChatController extends GetxController {
     try {
       isSending.value = true;
 
-      print(' SAHArSAHAr Sending message via SignalR: $messageText');
-      print(' SAHArSAHAr RideId: ${rideId.value}');
-      print(' SAHArSAHAr SenderId: ${currentUserId.value}');
+      print(' SAHAr Sending message via SignalR: $messageText');
+      print(' SAHAr RideId: ${rideId.value}');
+      print(' SAHAr SenderId: ${currentUserId.value}');
 
       // Send only via SignalR
       await hubConnection?.invoke('SendMessage', args: [
@@ -270,13 +270,13 @@ class ChatController extends GetxController {
         messageText,
       ]);
 
-      print(' SAHArSAHAr Message sent successfully via SignalR');
+      print(' SAHAr Message sent successfully via SignalR');
 
       // Clear input
       messageController.clear();
 
     } catch (e) {
-      print(' SAHArSAHAr Failed to send message: $e');
+      print(' SAHAr Failed to send message: $e');
       Get.snackbar('Send Error', 'Failed to send message via SignalR');
     } finally {
       isSending.value = false;
@@ -304,7 +304,7 @@ class ChatController extends GetxController {
     required String driverId,
     required String driverName,
   }) {
-    print(' SAHArSAHAr Updating ride info - Ride: $rideId, Driver: $driverId, Name: $driverName');
+    print(' SAHAr Updating ride info - Ride: $rideId, Driver: $driverId, Name: $driverName');
 
     // Store the old ride ID to check if it changed
     String oldRideId = this.rideId.value;

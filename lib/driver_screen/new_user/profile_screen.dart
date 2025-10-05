@@ -36,7 +36,7 @@ class ProfileScreen extends StatelessWidget {
               icon: Icon(Icons.edit, color: primaryColor),
               onPressed: () {
                 // Handle profile image change
-                print('Edit Profile Image');
+                print(' SAHAr Edit Profile Image');
               },
             ),
             const SizedBox(height: 20.0),
@@ -75,7 +75,7 @@ class ProfileScreen extends StatelessWidget {
         trailing: Icon(Icons.arrow_forward_ios, color: primaryColor),
         onTap: () {
           // Handle each item tap
-          print('$label tapped');
+          print(' SAHAr $label tapped');
         },
       ),
     );

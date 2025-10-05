@@ -44,7 +44,7 @@ class PermissionService extends GetxService {
 
       return isReady;
     } catch (e) {
-      print('PermissionService: Error checking permissions: $e');
+      print(' SAHAr PermissionService: Error checking permissions: $e');
       permissionError.value = 'Error checking permissions: $e';
       return false;
     } finally {
@@ -90,14 +90,14 @@ class PermissionService extends GetxService {
       hasLocationPermission.value = isGranted;
 
       if (isGranted) {
-        print('PermissionService: Location permissions granted');
+        print(' SAHAr PermissionService: Location permissions granted');
       } else {
         permissionError.value = 'Location permission is required for driver tracking.';
       }
 
       return isGranted;
     } catch (e) {
-      print('PermissionService: Error checking location permission: $e');
+      print(' SAHAr PermissionService: Error checking location permission: $e');
       permissionError.value = 'Error checking permissions: $e';
       hasLocationPermission.value = false;
       return false;
@@ -112,14 +112,14 @@ class PermissionService extends GetxService {
 
       if (!serviceEnabled) {
         permissionError.value = 'GPS/Location services are disabled. Please enable them.';
-        print('PermissionService: GPS is disabled');
+        print(' SAHAr PermissionService: GPS is disabled');
       } else {
-        print('PermissionService: GPS is enabled');
+        print(' SAHAr PermissionService: GPS is enabled');
       }
 
       return serviceEnabled;
     } catch (e) {
-      print('PermissionService: Error checking GPS status: $e');
+      print(' SAHAr PermissionService: Error checking GPS status: $e');
       isGpsEnabled.value = false;
       return false;
     }
@@ -131,12 +131,12 @@ class PermissionService extends GetxService {
       // Use openAppSettings from permission_handler - it's more reliable
       await openAppSettings();
     } catch (e) {
-      print('PermissionService: Error opening app settings: $e');
+      print(' SAHAr PermissionService: Error opening app settings: $e');
       // Fallback to Geolocator if permission_handler fails
       try {
         await Geolocator.openAppSettings();
       } catch (e2) {
-        print('PermissionService: Fallback also failed: $e2');
+        print(' SAHAr PermissionService: Fallback also failed: $e2');
       }
     }
   }
@@ -149,7 +149,7 @@ class PermissionService extends GetxService {
       await Future.delayed(const Duration(seconds: 1));
       await checkGpsStatus();
     } catch (e) {
-      print('PermissionService: Error opening location settings: $e');
+      print(' SAHAr PermissionService: Error opening location settings: $e');
     }
   }
 
@@ -241,7 +241,7 @@ class PermissionService extends GetxService {
       var status = await permission.request();
       return status.isGranted;
     } catch (e) {
-      print('PermissionService: Error requesting permission: $e');
+      print(' SAHAr PermissionService: Error requesting permission: $e');
       return false;
     }
   }
@@ -251,7 +251,7 @@ class PermissionService extends GetxService {
     try {
       return await permission.isPermanentlyDenied;
     } catch (e) {
-      print('PermissionService: Error checking permanent denial: $e');
+      print(' SAHAr PermissionService: Error checking permanent denial: $e');
       return false;
     }
   }

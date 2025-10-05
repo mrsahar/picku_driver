@@ -65,13 +65,13 @@ class _AddCarScreenState extends State<AddCarScreen> {
             // Car Documents Link
             _buildNavigationItem('Car Documents', Icons.arrow_forward_ios, () {
               // Navigate to Car Documents screen
-              print('Car Documents tapped');
+              print(' SAHAr Car Documents tapped');
             }),
 
             // Car Images Link
             _buildNavigationItem('Car Images', Icons.arrow_forward_ios, () {
               // Navigate to Car Images screen
-              print('Car Images tapped');
+              print(' SAHAr Car Images tapped');
             }),
 
             // Add New Car Button
@@ -79,7 +79,7 @@ class _AddCarScreenState extends State<AddCarScreen> {
             ElevatedButton(
               onPressed: () {
                 // Handle Add Car action
-                print('Add New Car pressed');
+                print(' SAHAr Add New Car pressed');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.primaryColor,

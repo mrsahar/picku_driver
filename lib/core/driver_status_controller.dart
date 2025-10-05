@@ -48,14 +48,14 @@ class DriverStatusController extends GetxController {
         return;
       }
 
-      print('SAHAr Driver initialized: $_driverName ($_driverId)');
+      print(' SAHAr Driver initialized: $_driverName ($_driverId)');
       statusMessage.value = 'Ready to go online';
 
       // Set driver info in SignalR service
       _signalRService.setDriverInfo(_driverId!, _driverName!);
 
     } catch (e) {
-      print('SAHAr Error initializing driver info: $e');
+      print(' SAHAr Error initializing driver info: $e');
       statusMessage.value = 'Error loading driver info';
       Get.snackbar('Initialization Error', 'Failed to load driver information: $e');
     } finally {
@@ -87,7 +87,7 @@ class DriverStatusController extends GetxController {
         await _goOnline();
       }
     } catch (e) {
-      print('SAHArSAHAr Error toggling driver status: $e');
+      print(' SAHAr Error toggling driver status: $e');
       statusMessage.value = 'Error: ${e.toString()}';
 
       Get.snackbar(
@@ -138,17 +138,17 @@ class DriverStatusController extends GetxController {
         duration: const Duration(seconds: 4),
       );
 
-      print('SAHArSAHAr Driver is now online with location tracking');
+      print(' SAHAr Driver is now online with location tracking');
 
     } catch (e) {
-      print('SAHArSAHAr Error going online: $e');
+      print(' SAHAr Error going online: $e');
 
       // Clean up on failure
       try {
         _signalRService.stopLocationUpdates();
         await _signalRService.disconnect();
       } catch (cleanupError) {
-        print('SAHAr Error during cleanup: $cleanupError');
+        print(' SAHAr Error during cleanup: $cleanupError');
       }
 
       throw Exception('Failed to go online: $e');
@@ -192,11 +192,11 @@ class DriverStatusController extends GetxController {
           duration: const Duration(seconds: 3),
         );
 
-        print('SAHArSAHAr Driver is now offline');
+        print(' SAHAr Driver is now offline');
 
       } else {
         // API call failed - but still disconnect locally to prevent data sending
-        print('SAHAr API Error Response: ${response.statusCode} - ${response.body}');
+        print(' SAHAr API Error Response: ${response.statusCode} - ${response.body}');
 
         // Force disconnect from SignalR to stop sending location data
         await _signalRService.disconnect();
@@ -228,11 +228,11 @@ class DriverStatusController extends GetxController {
           duration: const Duration(seconds: 4),
         );
 
-        print('SAHArSAHAr Driver offline locally (API failed): $errorMessage');
+        print(' SAHAr Driver offline locally (API failed): $errorMessage');
       }
 
     } catch (e) {
-      print('SAHArSAHAr Error going offline: $e');
+      print(' SAHAr Error going offline: $e');
 
       // Force cleanup even if everything fails - MOST IMPORTANT: stop location tracking
       try {
@@ -253,9 +253,9 @@ class DriverStatusController extends GetxController {
           duration: const Duration(seconds: 4),
         );
 
-        print('SAHArSAHAr Driver forced offline due to error - location tracking stopped');
+        print(' SAHAr Driver forced offline due to error - location tracking stopped');
       } catch (cleanupError) {
-        print('SAHAr Error during offline cleanup: $cleanupError');
+        print(' SAHAr Error during offline cleanup: $cleanupError');
       }
 
       throw Exception('Failed to go offline: $e');

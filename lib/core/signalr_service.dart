@@ -24,7 +24,7 @@ class SignalRService extends GetxService {
   StreamSubscription<Position>? _positionStream;
 
   // Configuration
-  static const String _hubUrl = 'http://sahilsally9-001-site1.qtempurl.com/rideHub';
+  static const String _hubUrl = 'http://pickurides.com/rideHub';
   static const String _emptyGuid = '00000000-0000-0000-0000-000000000000';
   static const double _minimumDistanceFilter = 10.0; // meters
   static const int _locationUpdateIntervalSeconds = 5;
@@ -32,7 +32,7 @@ class SignalRService extends GetxService {
   void setDriverInfo(String driverId, String driverName) {
     _driverId = driverId;
     _driverName = driverName;
-    print('SAHAr Driver info set: $driverName ($driverId)');
+    print(' SAHAr Driver info set: $driverName ($driverId)');
   }
   // Driver information (loaded from SharedPrefs)
   String? _driverId;
@@ -50,9 +50,9 @@ class SignalRService extends GetxService {
     try {
       _driverId = await SharedPrefsService.getUserId();
       _driverName = await SharedPrefsService.getUserFullName();
-      print('SAHAr Driver info loaded: $_driverName ($_driverId)');
+      print(' SAHAr Driver info loaded: $_driverName ($_driverId)');
     } catch (e) {
-      print('SAHAr Error loading driver info: $e');
+      print(' SAHAr Error loading driver info: $e');
     }
   }
 
@@ -69,7 +69,7 @@ class SignalRService extends GetxService {
 
 
     } catch (e) {
-      print('SAHAr Error initializing SignalR: $e');
+      print(' SAHAr Error initializing SignalR: $e');
       connectionStatus.value = 'Error: $e';
     }
   }
@@ -80,7 +80,7 @@ class SignalRService extends GetxService {
 
     // Connection state changes
     _hubConnection!.onclose((error) {
-      print('SAHAr SignalR connection closed: $error');
+      print(' SAHAr SignalR connection closed: $error');
       isConnected.value = false;
       connectionStatus.value = 'Disconnected';
 
@@ -91,12 +91,12 @@ class SignalRService extends GetxService {
     });
 
     _hubConnection!.onreconnecting((error) {
-      print('SAHAr SignalR reconnecting: $error');
+      print(' SAHAr SignalR reconnecting: $error');
       connectionStatus.value = 'Reconnecting...';
     });
 
     _hubConnection!.onreconnected((connectionId) {
-      print('SAHAr SignalR reconnected: $connectionId');
+      print(' SAHAr SignalR reconnected: $connectionId');
       isConnected.value = true;
       connectionStatus.value = 'Connected';
 
@@ -110,7 +110,7 @@ class SignalRService extends GetxService {
     _hubConnection!.on('RideAssigned', (List<Object?>? arguments) {
       if (arguments != null && arguments.isNotEmpty) {
         String newRideId = arguments[0].toString();
-        print('SAHAr Ride assigned: $newRideId');
+        print(' SAHAr Ride assigned: $newRideId');
         currentRideId.value = newRideId;
         _onRideAssigned(newRideId);
       }
@@ -120,7 +120,7 @@ class SignalRService extends GetxService {
     _hubConnection!.on('RideCompleted', (List<Object?>? arguments) {
       if (arguments != null && arguments.isNotEmpty) {
         String completedRideId = arguments[0].toString();
-        print('SAHAr Ride completed: $completedRideId');
+        print(' SAHAr Ride completed: $completedRideId');
 
         if (currentRideId.value == completedRideId) {
           currentRideId.value = '';
@@ -131,7 +131,7 @@ class SignalRService extends GetxService {
 
     // Listen for location acknowledgments
     _hubConnection!.on('LocationReceived', (List<Object?>? arguments) {
-      print('SAHAr Location update acknowledged by server');
+      print(' SAHAr Location update acknowledged by server');
     });
 
     // Listen for driver status changes from server
@@ -141,7 +141,7 @@ class SignalRService extends GetxService {
         bool isOnline = arguments[1] as bool;
 
         if (driverId == _driverId) {
-          print('SAHAr Driver status changed from server: $isOnline');
+          print(' SAHAr Driver status changed from server: $isOnline');
           // You can emit this to update UI if needed
         }
       }
@@ -159,12 +159,12 @@ class SignalRService extends GetxService {
 
       isConnected.value = true;
       connectionStatus.value = 'Connected';
-      print('SAHAr Successfully connected to SignalR hub');
+      print(' SAHAr Successfully connected to SignalR hub');
 
       return true;
 
     } catch (e) {
-      print('SAHAr Failed to connect to SignalR: $e');
+      print(' SAHAr Failed to connect to SignalR: $e');
       isConnected.value = false;
       connectionStatus.value = 'Connection failed: $e';
       return false;
@@ -184,12 +184,12 @@ class SignalRService extends GetxService {
   /// Send location update to SignalR hub
   Future<bool> sendLocationUpdate(double latitude, double longitude) async {
     if (!isConnected.value || _hubConnection == null) {
-      print('SAHAr Cannot send location: not connected');
+      print(' SAHAr Cannot send location: not connected');
       return false;
     }
 
     if (_driverId == null || _driverName == null) {
-      print('SAHAr Cannot send location: driver info not set');
+      print(' SAHAr Cannot send location: driver info not set');
       return false;
     }
 
@@ -197,7 +197,7 @@ class SignalRService extends GetxService {
       // Use current ride ID if available, otherwise use empty GUID
       String rideId = currentRideId.value.isEmpty ? _emptyGuid : currentRideId.value;
 
-      print('SAHAr Sending location: ($latitude, $longitude) for ride: $rideId');
+      print(' SAHAr Sending location: ($latitude, $longitude) for ride: $rideId');
 
       await _hubConnection!.invoke(
           'UpdateLocation',
@@ -205,11 +205,11 @@ class SignalRService extends GetxService {
       );
 
       locationUpdateCount.value++;
-      print('SAHAr Location sent successfully (Count: ${locationUpdateCount.value})');
+      print(' SAHAr Location sent successfully (Count: ${locationUpdateCount.value})');
       return true;
 
     } catch (e) {
-      print('SAHAr Error sending location: $e');
+      print(' SAHAr Error sending location: $e');
       return false;
     }
   }
@@ -217,7 +217,7 @@ class SignalRService extends GetxService {
   /// Start continuous location updates
   Future<void> startLocationUpdates({Duration interval = const Duration(seconds: 5)}) async {
     if (isLocationSending.value) {
-      print('SAHAr Location updates already running');
+      print(' SAHAr Location updates already running');
       return;
     }
 
@@ -225,7 +225,7 @@ class SignalRService extends GetxService {
     await _loadDriverInfo();
 
     if (_driverId == null || _driverName == null) {
-      print('SAHAr Cannot start location updates: driver info not available');
+      print(' SAHAr Cannot start location updates: driver info not available');
       Get.snackbar('Error', 'Driver information not available. Please login again.');
       return;
     }
@@ -233,7 +233,7 @@ class SignalRService extends GetxService {
     // Check if we have location permission
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-      print('SAHAr Location permission denied');
+      print(' SAHAr Location permission denied');
       Get.snackbar('Permission Required', 'Location permission is needed for live tracking');
       return;
     }
@@ -241,14 +241,14 @@ class SignalRService extends GetxService {
     // Check if location services are enabled
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      print('SAHAr Location services are disabled');
+      print(' SAHAr Location services are disabled');
       Get.snackbar('GPS Required', 'Please enable GPS to start location tracking');
       return;
     }
 
     isLocationSending.value = true;
     locationUpdateCount.value = 0;
-    print('SAHAr Starting continuous location updates every ${interval.inSeconds}s');
+    print(' SAHAr Starting continuous location updates every ${interval.inSeconds}s');
 
     // Start position stream for real-time updates
     const LocationSettings locationSettings = LocationSettings(
@@ -268,13 +268,13 @@ class SignalRService extends GetxService {
             lastSentLocation.value = position;
           } else if (!isConnected.value) {
             // Try to reconnect if sending failed due to connection
-            print('SAHAr Attempting to reconnect due to location send failure');
+            print(' SAHAr Attempting to reconnect due to location send failure');
             await connect();
           }
         }
       },
       onError: (error) {
-        print('SAHAr Position stream error: $error');
+        print(' SAHAr Position stream error: $error');
       },
     );
 
@@ -296,7 +296,7 @@ class SignalRService extends GetxService {
         }
 
       } catch (e) {
-        print('SAHAr Error getting location in timer: $e');
+        print(' SAHAr Error getting location in timer: $e');
       }
     });
 
@@ -310,7 +310,7 @@ class SignalRService extends GetxService {
         lastSentLocation.value = position;
       }
     } catch (e) {
-      print('SAHAr Error sending initial location: $e');
+      print(' SAHAr Error sending initial location: $e');
     }
   }
 
@@ -345,7 +345,7 @@ class SignalRService extends GetxService {
     }
 
     isLocationSending.value = false;
-    print('SAHAr All location updates stopped');
+    print(' SAHAr All location updates stopped');
   }
 
   /// Pause location updates (during connection issues)
@@ -353,7 +353,7 @@ class SignalRService extends GetxService {
     if (_positionStream != null) {
       _positionStream!.pause();
     }
-    print('SAHAr Location updates paused due to connection issue');
+    print(' SAHAr Location updates paused due to connection issue');
   }
 
   /// Resume location updates (after reconnection)
@@ -361,7 +361,7 @@ class SignalRService extends GetxService {
     if (_positionStream != null && _positionStream!.isPaused) {
       _positionStream!.resume();
     }
-    print('SAHAr Location updates resumed after reconnection');
+    print(' SAHAr Location updates resumed after reconnection');
   }
 
   /// Handle ride assignment
@@ -422,7 +422,7 @@ class SignalRService extends GetxService {
       await sendLocationUpdate(position.latitude, position.longitude);
 
     } catch (e) {
-      print('SAHAr Error sending current location: $e');
+      print(' SAHAr Error sending current location: $e');
       Get.snackbar('Error', 'Failed to send location: $e');
     }
   }

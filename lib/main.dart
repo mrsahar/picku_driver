@@ -2,13 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:get/get.dart';
 import 'package:pick_u_driver/bindings/initial_binding.dart';
-import 'package:pick_u_driver/core/location_service.dart';
 import 'package:pick_u_driver/routes/app_pages.dart';
 import 'package:pick_u_driver/utils/theme/app_theme.dart';
-
-import 'core/global_variables.dart';
-import 'core/map_service.dart';
-import 'core/signalr_service.dart';
 
 Future<void> main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();

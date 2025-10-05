@@ -45,29 +45,29 @@ class MapService extends GetxService {
   /// Initialize custom marker icons
   Future<void> _initializeCustomMarkers() async {
     try {
-      print(' SAHArLoading custom marker icons...');
+      print(' SAHAr Loading custom marker icons...');
 
       _userMarkerIcon = await BitmapDescriptor.asset(
         const ImageConfiguration(size: Size(48, 48)),
         'assets/img/user.png',
       );
-      print(' SAHArUser marker icon loaded successfully');
+      print(' SAHAr User marker icon loaded successfully');
 
       _driverMarkerIcon = await BitmapDescriptor.asset(
         const ImageConfiguration(size: Size(30 , 58)),
         'assets/img/taxi.png',
       );
-      print(' SAHArDriver marker icon loaded successfully');
+      print(' SAHAr Driver marker icon loaded successfully');
 
       _pointsMarkerIcon = await BitmapDescriptor.asset(
         const ImageConfiguration(size: Size(48, 48)),
         'assets/img/points.png',
       );
-      print(' SAHArPoints marker icon loaded successfully');
+      print(' SAHAr Points marker icon loaded successfully');
 
     } catch (e) {
-      print(' SAHArError loading custom marker icons: $e');
-      print(' SAHArWill use default markers as fallback');
+      print(' SAHAr Error loading custom marker icons: $e');
+      print(' SAHAr Will use default markers as fallback');
     }
   }
 
@@ -152,7 +152,7 @@ class MapService extends GetxService {
       }
 
     } catch (e) {
-      print(' SAHArError creating route markers and polylines: $e');
+      print(' SAHAr Error creating route markers and polylines: $e');
       Get.snackbar('Route Error', 'Failed to create route visualization');
     } finally {
       isLoadingRoute.value = false;
@@ -203,7 +203,7 @@ class MapService extends GetxService {
         await _createSegmentRoutes(routePoints);
       }
     } catch (e) {
-      print(' SAHArError creating route polylines: $e');
+      print(' SAHAr Error creating route polylines: $e');
       await _createFallbackPolylines(routePoints);
     }
   }
@@ -228,7 +228,7 @@ class MapService extends GetxService {
           patterns: patterns,
         ));
       } catch (e) {
-        print(' SAHArError creating segment $i: $e');
+        print(' SAHAr Error creating segment $i: $e');
         _createFallbackSegment(routePoints[i], routePoints[i + 1], i);
       }
     }
@@ -270,7 +270,7 @@ class MapService extends GetxService {
   void updateDriverMarkerWithAnimation(double lat, double lng, String driverName, {bool centerMap = true}) {
     final newLocation = LatLng(lat, lng);
 
-    print(' SAHArSAHAR Updating driver location: $lat, $lng');
+    print(' SAHAr Updating driver location: $lat, $lng');
 
     if (centerMap) {
       animateToLocation(newLocation, zoom: 16.0);
@@ -518,7 +518,7 @@ class MapService extends GetxService {
         ),
       );
     } catch (e) {
-      print(' SAHArError animating to location: $e');
+      print(' SAHAr Error animating to location: $e');
     }
   }
 
@@ -605,7 +605,7 @@ class MapService extends GetxService {
         CameraUpdate.newLatLngBounds(bounds, 120.0),
       );
     } catch (e) {
-      print(' SAHArError fitting map to locations: $e');
+      print(' SAHAr Error fitting map to locations: $e');
     }
   }
 
@@ -632,8 +632,8 @@ class MapService extends GetxService {
 
   /// Add or update user location marker
   void updateUserLocationMarker(double lat, double lng, {String title = 'Your Location'}) {
-    print(' SAHArAdding user location marker at: $lat, $lng');
-    print(' SAHArUsing custom user icon: ${_userMarkerIcon != null}');
+    print(' SAHAr Adding user location marker at: $lat, $lng');
+    print(' SAHAr Using custom user icon: ${_userMarkerIcon != null}');
 
     final userMarker = Marker(
       markerId: const MarkerId('user_location'),
@@ -648,7 +648,7 @@ class MapService extends GetxService {
     // Remove existing user marker and add new one
     markers.removeWhere((marker) => marker.markerId.value == 'user_location');
     markers.add(userMarker);
-    print(' SAHArUser location marker added. Total markers: ${markers.length}');
+    print(' SAHAr User location marker added. Total markers: ${markers.length}');
   }
 
   @override

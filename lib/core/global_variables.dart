@@ -9,7 +9,7 @@ class GlobalVariables extends GetxController {
   // Reactive variables
   final RxString _userToken = ''.obs;
   final RxBool _isLoggedIn = false.obs;
-  final RxString _baseUrl = 'http://sahilsally9-001-site1.qtempurl.com'.obs;
+  final RxString _baseUrl = 'http://pickurides.com'.obs;
   final RxBool _isLoading = false.obs;
   final RxString _userEmail = ''.obs;
 

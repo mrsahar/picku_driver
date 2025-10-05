@@ -120,7 +120,7 @@ class LocationService extends GetxService {
         }
       }
     } catch (e) {
-      print(' SAHArError getting address: $e');
+      print(' SAHAr Error getting address: $e');
     }
 
     // Instead of "Unknown location", return formatted coordinates
@@ -131,7 +131,7 @@ class LocationService extends GetxService {
     try {
       return await locationFromAddress(query);
     } catch (e) {
-      print(' SAHArError searching places: $e');
+      print(' SAHAr Error searching places: $e');
       return [];
     }
   }

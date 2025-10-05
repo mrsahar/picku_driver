@@ -29,9 +29,9 @@ class DriverService extends GetxService {
       driverName.value = prefs.getString(_driverNameKey);
       isLoggedIn.value = prefs.getBool(_isLoggedInKey) ?? false;
 
-      print('Driver data loaded: ID=${driverId.value}, Name=${driverName.value}');
+      print(' SAHAr Driver data loaded: ID=${driverId.value}, Name=${driverName.value}');
     } catch (e) {
-      print('Error loading driver data: $e');
+      print(' SAHAr Error loading driver data: $e');
     }
   }
 
@@ -52,10 +52,10 @@ class DriverService extends GetxService {
       driverName.value = name;
       isLoggedIn.value = true;
 
-      print('Driver login saved: ID=$id, Name=$name');
+      print(' SAHAr Driver login saved: ID=$id, Name=$name');
       return true;
     } catch (e) {
-      print('Error saving driver login: $e');
+      print(' SAHAr Error saving driver login: $e');
       return false;
     }
   }
@@ -74,10 +74,10 @@ class DriverService extends GetxService {
       driverName.value = null;
       isLoggedIn.value = false;
 
-      print('Driver data cleared');
+      print(' SAHAr Driver data cleared');
       return true;
     } catch (e) {
-      print('Error clearing driver data: $e');
+      print(' SAHAr Error clearing driver data: $e');
       return false;
     }
   }
@@ -99,7 +99,7 @@ class DriverService extends GetxService {
       driverName.value = name;
       return true;
     } catch (e) {
-      print('Error updating driver name: $e');
+      print(' SAHAr Error updating driver name: $e');
       return false;
     }
   }

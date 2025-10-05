@@ -60,7 +60,7 @@ class ChatScreen extends GetView<ChatController> {
                   ),
                 ),
                 Text(
-                  'Driver',
+                  'Passenger',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.8),
                     fontSize: 12,

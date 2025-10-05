@@ -62,7 +62,7 @@ class CarDocumentsScreen extends StatelessWidget {
         ),
         onTap: () {
           Get.to(() => const AddCarScreen());
-          print('$title tapped');
+          print(' SAHAr $title tapped');
         },
       ),
     );

@@ -148,7 +148,7 @@ class AppPages {
 // If you don't have VerifyMessageScreen route yet, add it:
     GetPage(
       name: AppRoutes.VERIFY_MESSAGE,
-      page: () => VerifyMessageScreen(),
+      page: () => VerifyMessageScreen.fromArguments(),
     ),
   ];
 }

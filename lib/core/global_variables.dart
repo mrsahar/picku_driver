@@ -12,6 +12,7 @@ class GlobalVariables extends GetxController {
   final RxString _baseUrl = 'http://pickurides.com'.obs;
   final RxBool _isLoading = false.obs;
   final RxString _userEmail = ''.obs;
+  final RxString _userId = ''.obs;
 
   // Getters
   String get userToken => _userToken.value;
@@ -19,6 +20,7 @@ class GlobalVariables extends GetxController {
   String get baseUrl => _baseUrl.value;
   bool get isLoading => _isLoading.value;
   String get userEmail => _userEmail.value;
+  String get userId => _userId.value;
 
   RxString get userEmailRx => _userEmail;
 
@@ -30,6 +32,11 @@ class GlobalVariables extends GetxController {
   void setUserEmail(String email) { // ✅ Added email setter
     _userEmail.value = email;
   }
+
+  void setUserId(String id) { // ✅ Added userId setter
+    _userId.value = id;
+  }
+
   void _loadStoredData() {
   }
 
@@ -53,7 +60,7 @@ class GlobalVariables extends GetxController {
   void clearUserData() {
     _userToken.value = '';
     _isLoggedIn.value = false;
-
+    _userId.value = '';
   }
   bool get hasUserEmail => _userEmail.value.isNotEmpty;
 

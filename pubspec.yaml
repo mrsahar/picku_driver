@@ -55,6 +55,7 @@ dependencies:
   signalr_core: ^1.1.2
   url_launcher: ^6.3.2
   flutter_launcher_icons: ^0.14.4
+  http_parser: ^4.1.2
 
 dev_dependencies:
   flutter_test:

@@ -74,7 +74,7 @@ class LoginController extends GetxController {
     return "deviceToken_placeholder_${DateTime.now().millisecondsSinceEpoch}";
   }
 
-  // Updated Login method with SharedPrefsService integration
+  // Updated Login method with approval status handling
   Future<void> login(BuildContext context) async {
     // Use formKey.currentState!.validate() instead of manual validation
     if (!formKey.currentState!.validate()) {
@@ -94,42 +94,75 @@ class LoginController extends GetxController {
       final response = await _apiProvider.login(loginRequest);
 
       if (response.success && response.data != null) {
-        // Check if the message is "Login successful"
         final message = response.data['message'] ?? response.message;
+        final approvalStatus = response.data['approvalStatus'];
 
-        if (message == "Login successful") {
+        print(' SAHAr 📊 Login: ApprovalStatus received: $approvalStatus');
+        print(' SAHAr 📝 Login: Message received: $message');
+
+        // Check for invalid credentials first
+        if (message == "Invalid Credentials") {
+          // Show error message and do nothing else
+          Get.snackbar(
+            'Invalid Credentials',
+            'Please check your email and password and try again.',
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+            snackPosition: SnackPosition.TOP,
+            duration: const Duration(seconds: 3),
+          );
+          return; // Exit early, don't navigate anywhere
+        }
+
+        // Clear form only if not invalid credentials
+        clearForm();
+
+        // Check approval status and handle accordingly
+        if (approvalStatus == "Rejected" || approvalStatus == "Pending") {
+          // DO NOT save user data for rejected/pending users
+          // Only set temporary global variables for UI purposes
+          final globalVars = GlobalVariables.instance;
+          globalVars.setUserEmail(response.data['email'] ?? emailController.text.trim());
+          globalVars.setUserId(response.data['userId'] ?? ''); // Add userId for rejected/pending users
+
+          // Show status-specific message
+          Get.snackbar(
+            approvalStatus == "Rejected" ? 'Account Rejected' : 'Account Pending',
+            message,
+            backgroundColor: approvalStatus == "Rejected" ? Colors.red : Colors.orange,
+            colorText: Colors.white,
+            snackPosition: SnackPosition.TOP,
+            duration: const Duration(seconds: 3),
+          );
+
+          // Navigate to verification screen with arguments
+          Get.offAllNamed(AppRoutes.VERIFY_MESSAGE, arguments: {
+            'status': approvalStatus,
+            'message': message,
+          });
+
+        } else {
+          // ONLY save user data for approved users
           await SharedPrefsService.saveUserDataFromResponse(response.data);
 
           final globalVars = GlobalVariables.instance;
           globalVars.setUserEmail(response.data['email'] ?? emailController.text.trim());
           globalVars.setLoginStatus(true);
           globalVars.setUserToken(response.data['token']);
+          globalVars.setUserId(response.data['userId'] ?? ''); // Add userId for approved users too
 
-          // Clear form on success
-          clearForm();
-
-          // Show success message
+          // Approved user - normal login flow
           Get.snackbar(
             'Success',
-            message,
+            'Login successful',
             backgroundColor: Colors.green,
             colorText: Colors.white,
             snackPosition: SnackPosition.TOP,
             duration: const Duration(seconds: 2),
           );
 
-          // Navigate to MainMap
+          // Navigate to MainMap for approved users
           Get.offAllNamed(AppRoutes.MainMap);
-        } else {
-          // Show the message from API response
-          Get.snackbar(
-            'Error',
-            message,
-            backgroundColor: Colors.red,
-            colorText: Colors.white,
-            snackPosition: SnackPosition.TOP,
-            duration: const Duration(seconds: 3),
-          );
         }
       } else {
         // Handle API error response
@@ -162,43 +195,35 @@ class LoginController extends GetxController {
     try {
       print(' SAHAr 🔍 Checking authentication status...');
 
-      // Get user data from SharedPreferences
       final userData = await SharedPrefsService.getUserData();
       final token = userData['token'];
       final expiresStr = userData['expires'];
       final isLoggedIn = userData['isLoggedIn'];
+      final approvalStatus = userData['approvalStatus'];
 
-      print(' SAHAr 📱 Token exists: ${token != null}');
-      print(' SAHAr 📱 Is logged in: $isLoggedIn');
-      print(' SAHAr 📱 Expires: $expiresStr');
-
-      // Check if user has login data
       if (token != null && token.isNotEmpty && isLoggedIn == 'true') {
         print(' SAHAr ✅ User has login data, checking token expiry...');
 
-        // Check if token is expired
         final isTokenExpired = await SharedPrefsService.isTokenExpired();
         final now = DateTime.now();
 
         if (expiresStr != null) {
           try {
             final expiryDate = DateTime.parse(expiresStr);
-            print(' SAHAr ⏰ Token expires at: $expiryDate');
-            print(' SAHAr ⏰ Current time: $now');
-            print(' SAHAr ⏰ Token expired: $isTokenExpired');
 
             if (!isTokenExpired && now.isBefore(expiryDate)) {
-              // Token is valid, navigate to MainMap
-              print(' SAHAr 🚀 Token is valid, navigating to MainMap');
-
-              // Update GlobalVariables for consistency
+              // Token is valid, check approval status
               final globalVars = GlobalVariables.instance;
               globalVars.setUserToken(token);
               globalVars.setUserEmail(userData['email'] ?? '');
               globalVars.setLoginStatus(true);
 
-              // Navigate to MainMap
-              Get.offAllNamed(AppRoutes.MainMap);
+              // Navigate based on approval status
+              if (approvalStatus == "Rejected" || approvalStatus == "Pending") {
+                Get.offAllNamed(AppRoutes.VERIFY_MESSAGE);
+              } else {
+                Get.offAllNamed(AppRoutes.MainMap);
+              }
               return;
             }
           } catch (e) {
@@ -206,17 +231,15 @@ class LoginController extends GetxController {
           }
         }
 
-        // Token is expired or invalid
-        print(' SAHAr ❌ Token expired or invalid, clearing data and staying on login');
+        // Token expired
+        print(' SAHAr ❌ Token expired, clearing data');
         await SharedPrefsService.clearUserData();
 
-        // Clear GlobalVariables
         final globalVars = GlobalVariables.instance;
         globalVars.setLoginStatus(false);
         globalVars.setUserToken('');
         globalVars.setUserEmail('');
 
-        // Show session expired message
         Get.snackbar(
           'Session Expired',
           'Your session has expired. Please login again.',
@@ -225,12 +248,9 @@ class LoginController extends GetxController {
           snackPosition: SnackPosition.TOP,
           duration: const Duration(seconds: 3),
         );
-      } else {
-        print(' SAHAr ❌ No valid login data found, staying on login screen');
       }
     } catch (e) {
       print(' SAHAr 💥 Error checking authentication status: $e');
-      // On error, clear any corrupted data and stay on login screen
       await SharedPrefsService.clearUserData();
     }
   }

@@ -1,8 +1,9 @@
 import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter/material.dart';
-import 'package:pick_u_driver/core/sharePref.dart';
+import 'package:pick_u_driver/core/global_variables.dart';
 import 'package:pick_u_driver/models/driver_documents_response.dart';
 import 'package:pick_u_driver/providers/api_provider.dart';
 import 'package:pick_u_driver/utils/theme/mcolors.dart';
@@ -181,9 +182,9 @@ class DriverDocumentsController extends GetxController {
     try {
       isUploading.value = true;
 
-      // Get user ID from SharedPreferences
-      final String? driverId = await SharedPrefsService.getUserId();
-      if (driverId == null || driverId.isEmpty) {
+      // Get user ID from GlobalVariables
+      final String driverId = GlobalVariables.instance.userId;
+      if (driverId.isEmpty) {
         _showErrorSnackbar('Driver ID not found. Please login again.');
         isUploading.value = false;
         return;
@@ -191,31 +192,70 @@ class DriverDocumentsController extends GetxController {
 
       print(' SAHAr 🚀 Starting document upload for driver: $driverId');
 
-      // Create FormData
-      final formData = FormData({
-        'DriverId': driverId,
-        'LicenseImage': MultipartFile(
-          licenseImage.value!,
-          filename: '${driverId}_License.${licenseImage.value!.path.split('.').last}',
-        ),
-        'RegistrationImage': MultipartFile(
-          registrationImage.value!,
-          filename: '${driverId}_Registration.${registrationImage.value!.path.split('.').last}',
-        ),
-        'InsuranceImage': MultipartFile(
-          insuranceImage.value!,
-          filename: '${driverId}_Insurance.${insuranceImage.value!.path.split('.').last}',
-        ),
-        'SelfieImage': MultipartFile(
-          selfieImage.value!,
-          filename: '${driverId}_Selfie.${selfieImage.value!.path.split('.').last}',
-        ),
-      });
+      // Read files as bytes
+      final licenseBytes = await licenseImage.value!.readAsBytes();
+      final registrationBytes = await registrationImage.value!.readAsBytes();
+      final insuranceBytes = await insuranceImage.value!.readAsBytes();
+      final selfieBytes = await selfieImage.value!.readAsBytes();
 
-      // Make API call
-      final response = await _apiProvider.postData2(
+      print(' SAHAr 📖 Files read successfully');
+      print(' SAHAr 📏 License size: ${licenseBytes.length} bytes');
+      print(' SAHAr 📏 Registration size: ${registrationBytes.length} bytes');
+      print(' SAHAr 📏 Insurance size: ${insuranceBytes.length} bytes');
+      print(' SAHAr 📏 Selfie size: ${selfieBytes.length} bytes');
+
+      // Get file extensions
+      final licenseExt = licenseImage.value!.path.split('.').last.toLowerCase();
+      final registrationExt = registrationImage.value!.path.split('.').last.toLowerCase();
+      final insuranceExt = insuranceImage.value!.path.split('.').last.toLowerCase();
+      final selfieExt = selfieImage.value!.path.split('.').last.toLowerCase();
+
+      // Determine content types
+      String getContentType(String ext) {
+        switch (ext) {
+          case 'jpg':
+          case 'jpeg':
+            return 'image/jpeg';
+          case 'png':
+            return 'image/png';
+          default:
+            return 'image/jpeg';
+        }
+      }
+
+      // Create a Map to pass file data to API provider
+      final fileData = {
+        'driverId': driverId,
+        'files': {
+          'LicenseImage': {
+            'bytes': licenseBytes,
+            'filename': 'license.$licenseExt',
+            'contentType': getContentType(licenseExt),
+          },
+          'RegistrationImage': {
+            'bytes': registrationBytes,
+            'filename': 'registration.$registrationExt',
+            'contentType': getContentType(registrationExt),
+          },
+          'InsuranceImage': {
+            'bytes': insuranceBytes,
+            'filename': 'insurance.$insuranceExt',
+            'contentType': getContentType(insuranceExt),
+          },
+          'SelfieImage': {
+            'bytes': selfieBytes,
+            'filename': 'selfie.$selfieExt',
+            'contentType': getContentType(selfieExt),
+          },
+        },
+      };
+
+      print(' SAHAr 📤 File data prepared with 4 files');
+
+      // Make API call using uploadMultipart
+      final response = await _apiProvider.uploadMultipart(
         '/api/Drivers/upload-images',
-        formData,
+        fileData,
       );
 
       isUploading.value = false;
@@ -236,7 +276,8 @@ class DriverDocumentsController extends GetxController {
           },
         );
       } else {
-        print(' SAHAr ❌ Upload failed with status: ${response.statusCode}');
+        print('SAHAr ❌ Upload failed with status: ${response.statusCode}, message: ${response.statusText}, body: ${response.body}');
+
         _showErrorSnackbar(
           'Upload failed. Please check your images and try again.\nError: ${response.statusText ?? 'Unknown error'}',
         );

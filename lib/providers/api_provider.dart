@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:pick_u_driver/core/global_variables.dart';
 import 'package:pick_u_driver/models/forgot_password_model.dart';
 import 'package:pick_u_driver/models/login_model.dart';
@@ -97,6 +101,88 @@ class ApiProvider extends GetConnect {
       return Response(
         statusCode: 500,
         statusText: 'Network Error: $e',
+      );
+    }
+  }
+
+  Future<Response> uploadMultipart(String endpoint, Map<String, dynamic> fileData) async {
+    try {
+      _globalVars.setLoading(true);
+
+      final uri = Uri.parse('${_globalVars.baseUrl}$endpoint');
+      print(' SAHAr : Upload URI: $uri');
+
+      var request = http.MultipartRequest('POST', uri);
+
+      // Add authorization header if token exists
+      if (_globalVars.userToken.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer ${_globalVars.userToken}';
+      }
+
+      print(' SAHAr : Request headers: ${request.headers}');
+
+      // Add DriverId field
+      request.fields['DriverId'] = fileData['driverId'];
+      print(' SAHAr : Added field: DriverId = ${fileData['driverId']}');
+
+      // Add files from the map
+      final files = fileData['files'] as Map<String, dynamic>;
+      for (var entry in files.entries) {
+        final fileInfo = entry.value as Map<String, dynamic>;
+        final bytes = fileInfo['bytes'] as List<int>;
+        final filename = fileInfo['filename'] as String;
+        final contentType = fileInfo['contentType'] as String;
+
+        request.files.add(http.MultipartFile.fromBytes(
+          entry.key,
+          bytes,
+          filename: filename,
+          contentType: MediaType.parse(contentType),
+        ));
+
+        print(' SAHAr : Added file: ${entry.key} - $filename (${bytes.length} bytes, $contentType)');
+      }
+
+      print(' SAHAr : Sending multipart request with ${request.files.length} files...');
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print(' SAHAr : Response status: ${response.statusCode}');
+      print(' SAHAr : Response headers: ${response.headers}');
+      print(' SAHAr : Response body: ${response.body}');
+
+      _globalVars.setLoading(false);
+
+      // Parse response body - handle both JSON and plain text
+      dynamic responseBody;
+      try {
+        if (response.body.isNotEmpty) {
+          // Try to parse as JSON first
+          responseBody = jsonDecode(response.body);
+        } else {
+          responseBody = '';
+        }
+      } catch (e) {
+        // If JSON parsing fails, it's plain text - wrap it in a Map for consistency
+        print(' SAHAr : Response is plain text, wrapping in map');
+        responseBody = {
+          'message': response.body,
+          'success': response.statusCode == 200,
+        };
+      }
+
+      return Response(
+        statusCode: response.statusCode,
+        statusText: response.reasonPhrase,
+        body: responseBody,
+      );
+    } catch (e, stackTrace) {
+      _globalVars.setLoading(false);
+      print(' SAHAr : Exception during upload: $e');
+      print(' SAHAr : Stack trace: $stackTrace');
+      return Response(
+        statusCode: 500,
+        statusText: 'Upload Error: $e',
       );
     }
   }

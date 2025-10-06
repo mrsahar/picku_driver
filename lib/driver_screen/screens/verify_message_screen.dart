@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:pick_u_driver/utils/theme/mcolors.dart';
+import 'package:pick_u_driver/routes/app_routes.dart';
 
 import '../main_map.dart';
 
@@ -25,6 +26,32 @@ class VerifyMessageScreen extends StatelessWidget {
     this.status = VerificationStatus.pending,
     this.rejectionReason,
   });
+
+  // Factory constructor to create from Get arguments
+  factory VerifyMessageScreen.fromArguments() {
+    final args = Get.arguments as Map<String, dynamic>?;
+
+    VerificationStatus status = VerificationStatus.pending;
+    String? rejectionReason;
+
+    if (args != null) {
+      final statusString = args['status'] as String?;
+      rejectionReason = args['message'] as String?;
+
+      if (statusString == 'Rejected') {
+        status = VerificationStatus.rejected;
+      } else if (statusString == 'Pending') {
+        status = VerificationStatus.pending;
+      } else if (statusString == 'Approved') {
+        status = VerificationStatus.verified;
+      }
+    }
+
+    return VerifyMessageScreen(
+      status: status,
+      rejectionReason: rejectionReason,
+    );
+  }
 
   IconData _getStatusIcon() {
     switch (status) {
@@ -234,7 +261,7 @@ class VerifyMessageScreen extends StatelessWidget {
               ),
               child: ElevatedButton(
                 onPressed: () {
-                //primaryNavy  Get.to(() => const VerificationPage());
+                  Get.toNamed(AppRoutes.DRIVER_DOCUMENTS);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
@@ -298,7 +325,7 @@ class VerifyMessageScreen extends StatelessWidget {
               ),
               child: OutlinedButton(
                 onPressed: () {
-                  Get.back();
+                  Get.offAllNamed(AppRoutes.LOGIN_SCREEN);
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,

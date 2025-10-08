@@ -17,8 +17,10 @@ class ApiProvider extends GetConnect {
   void onInit() {
     super.onInit();
 
-    // Configure base URL
-    httpClient.baseUrl = _globalVars.baseUrl;
+    // Configure base URL - make sure it's set properly
+    final baseUrl = _globalVars.baseUrl;
+    print(' SAHAr 🔧 ApiProvider onInit: Setting base URL to: $baseUrl');
+    httpClient.baseUrl = baseUrl;
 
     // Add request interceptor
     httpClient.addRequestModifier<dynamic>((request) {
@@ -26,6 +28,8 @@ class ApiProvider extends GetConnect {
       if (_globalVars.userToken.isNotEmpty) {
         request.headers['Authorization'] = 'Bearer ${_globalVars.userToken}';
       }
+      print(' SAHAr 🔧 Request: ${request.method} ${request.url}');
+      print(' SAHAr 🔧 Headers: ${request.headers}');
       return request;
     });
 
@@ -36,21 +40,98 @@ class ApiProvider extends GetConnect {
     });
   }
 
-  // GET Request
+  // GET Request with enhanced error handling
   Future<Response> getData(String endpoint) async {
     try {
+      print('SAHAr: Setting loading true');
       _globalVars.setLoading(true);
-      final response = await get(endpoint);
+
+      // Check if base URL is properly set
+      final currentBaseUrl = _globalVars.baseUrl;
+      print('SAHAr: Current base URL: $currentBaseUrl');
+      print('SAHAr: HttpClient base URL: ${httpClient.baseUrl}');
+
+      // Ensure base URL is set on httpClient
+      if (httpClient.baseUrl != currentBaseUrl) {
+        print('SAHAr: Updating httpClient base URL');
+        httpClient.baseUrl = currentBaseUrl;
+      }
+
+      print('SAHAr: Sending GET request to $endpoint');
+      print('SAHAr: Full URL will be: ${httpClient.baseUrl}$endpoint');
+
+      final response = await get(endpoint).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          print('SAHAr: Timeout occurred');
+          return Response(
+            statusCode: 408,
+            statusText: 'Request timeout. Please try again.',
+          );
+        },
+      );
+
+      print('SAHAr: Response received with status ${response.statusCode}');
       _globalVars.setLoading(false);
+
+      if (response.isOk) {
+        print('SAHAr ✅ API Success: $endpoint - ${response.statusCode}');
+        return response;
+      }
+
+      if (response.statusCode == 401) {
+        print('SAHAr ❌ Unauthorized: Token expired or invalid');
+        return response;
+      }
+
+      if (response.statusCode == 403) {
+        print('SAHAr ❌ Forbidden: No permission to access');
+        return Response(
+          statusCode: 403,
+          statusText: 'You do not have permission to access this resource.',
+        );
+      }
+
+      if (response.statusCode == 404) {
+        print('SAHAr ❌ Not Found: Endpoint does not exist');
+        return Response(
+          statusCode: 404,
+          statusText: 'Resource not found.',
+        );
+      }
+
+      if (response.statusCode == 500) {
+        print('SAHAr ❌ Server Error: ${response.statusText}');
+        return Response(
+          statusCode: 500,
+          statusText: 'Server error. Please try again later.',
+        );
+      }
+
+      print('SAHAr ⚠️ API Error: ${response.statusCode} - ${response.statusText}');
       return response;
+
     } catch (e) {
       _globalVars.setLoading(false);
+      print('❌ Unexpected Error in getData: $e');
+      print('❌ Error type: ${e.runtimeType}');
+
+      // Handle specific error types
+      if (e.toString().contains('No host specified')) {
+        print('❌ Base URL issue detected');
+        return Response(
+          statusCode: 500,
+          statusText: 'Base URL not configured properly. Please check your configuration.',
+        );
+      }
+
       return Response(
         statusCode: 500,
-        statusText: 'Network Error: $e',
+        statusText: 'Unexpected error: ${e.toString()}',
       );
     }
   }
+
 
   // POST Request
   Future<Response> postData(String endpoint, Map<String, dynamic> data) async {

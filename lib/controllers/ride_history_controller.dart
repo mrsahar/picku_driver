@@ -43,7 +43,7 @@ class RideHistoryController extends GetxController {
         return;
       }
 
-      final endpoint = '/api/Ride/get-user-rides-history?userId=$userId';
+      final endpoint = '/api/Ride/get-driver-rides-history?driverId=$userId';
       print(' SAHAr : endpoint = $endpoint');
       print(' SAHAr : full URL = ${_apiProvider.httpClient.baseUrl}$endpoint');
 
@@ -59,8 +59,32 @@ class RideHistoryController extends GetxController {
       print(' SAHAr : response.body = ${response.body}');
 
       if (response.statusCode == 200) {
-        final historyResponse = RideHistoryResponse.fromJson(response.body);
-        _rideHistory.value = historyResponse;
+        // Check if response.body is a List or Map
+        if (response.body is List) {
+          // API returned a direct list of rides
+          print(' SAHAr : API returned a List directly');
+          final ridesList = (response.body as List)
+              .map((item) => RideItem.fromJson(item as Map<String, dynamic>))
+              .toList();
+
+          // Calculate completed rides
+          final completed = ridesList.where((ride) => ride.status.toLowerCase() == 'completed').length;
+
+          // Calculate total fare
+          final totalFareAmount = ridesList.fold<double>(0.0, (sum, ride) => sum + ride.fareFinal);
+
+          // Create RideHistoryResponse manually
+          _rideHistory.value = RideHistoryResponse(
+            items: ridesList,
+            completedRides: completed,
+            totalFare: totalFareAmount,
+          );
+        } else {
+          // API returned an object with items property
+          print(' SAHAr : API returned a Map/Object');
+          final historyResponse = RideHistoryResponse.fromJson(response.body);
+          _rideHistory.value = historyResponse;
+        }
         print(' SAHAr : ride history loaded successfully');
       } else if (response.statusCode == 405) {
         // Method not allowed - check if endpoint expects POST instead of GET

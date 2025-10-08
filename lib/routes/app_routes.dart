@@ -32,6 +32,7 @@ abstract class AppRoutes {
   //verification pages of driver documents
   static const DRIVER_DOCUMENTS = '/driver-documents';
   static const VERIFY_MESSAGE = '/verify-message';
+  static const EarningSCREEN = '/earnings';
 
 
   }

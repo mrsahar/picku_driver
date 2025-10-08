@@ -7,6 +7,7 @@ import 'package:pick_u_driver/authentication/reset_password_screen.dart';
 import 'package:pick_u_driver/authentication/signup_screen.dart';
 import 'package:pick_u_driver/bindings/driver_documents_binding.dart';
 import 'package:pick_u_driver/bindings/driver_profile_binding.dart';
+import 'package:pick_u_driver/bindings/earnings_binding.dart';
 import 'package:pick_u_driver/bindings/forgot_password_binding.dart';
 import 'package:pick_u_driver/bindings/login_binding.dart';
 import 'package:pick_u_driver/bindings/otp_binding.dart';
@@ -14,6 +15,7 @@ import 'package:pick_u_driver/bindings/reset_password_binding.dart';
 import 'package:pick_u_driver/bindings/shift_application_binding.dart';
 import 'package:pick_u_driver/bindings/signup_binding.dart';
 import 'package:pick_u_driver/driver_screen/driver_documents_page.dart';
+import 'package:pick_u_driver/driver_screen/earnings_page.dart';
 import 'package:pick_u_driver/driver_screen/screens/verify_message_screen.dart';
 import 'package:pick_u_driver/routes/app_route_observer.dart';
 import 'package:pick_u_driver/driver_screen/main_map.dart';
@@ -145,7 +147,12 @@ class AppPages {
       binding: DriverDocumentsBinding(),
     ),
 
-// If you don't have VerifyMessageScreen route yet, add it:
+    GetPage(
+      name: AppRoutes.EarningSCREEN,
+      page: () => const EarningsPage(),
+      binding: EarningsBinding(),
+    ),
+
     GetPage(
       name: AppRoutes.VERIFY_MESSAGE,
       page: () => VerifyMessageScreen.fromArguments(),

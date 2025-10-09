@@ -60,9 +60,9 @@ Widget buildModernDrawer(BuildContext context, bool isDark) {
             children: [
               _ModernMenuTile(
                 icon: LineAwesomeIcons.wallet_solid,
-                title: 'Earnings & Wallet',
+                title: 'Earnings',
                 isDark: isDark,
-                badge: '2',
+               // badge: '2',
                 badgeColor: MColor.trackingOrange,
                 onTap: () => Get.toNamed(AppRoutes.EarningSCREEN),
               ),
@@ -101,7 +101,7 @@ Widget buildModernDrawer(BuildContext context, bool isDark) {
 
           // Logout Section
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 16),
             child: _ModernMenuTile(
               icon: LineAwesomeIcons.sign_out_alt_solid,
               title: 'Logout',

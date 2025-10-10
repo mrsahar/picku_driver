@@ -8,6 +8,7 @@ class MColor {
 
   // Primary colors
   static Color get primaryNavy => const Color(0xFF1A2A44); // Deep navy blue for headers, buttons, accents
+  static Color get primaryPlusNavy => const Color(0xFF305EA8); // Deep navy blue for headers, buttons, accents
   static Color get trackingOrange => const Color(0xFF1A2A44); // Orange for tracking car icon/button
 
   // Additional colors for better theme support

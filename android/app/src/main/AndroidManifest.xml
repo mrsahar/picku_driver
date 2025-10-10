@@ -1,14 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    <!-- Internet permission -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Wake lock for background location -->
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Foreground service permissions (Android 9+) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- Wake lock for keeping service alive -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Internet for SignalR -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Notification permissions (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Exact alarm permission (Android 12+) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:label="Pick U Driver"

@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:pick_u_driver/core/google_directions_service.dart';
 import 'package:pick_u_driver/models/location_model.dart';
 import 'package:pick_u_driver/utils/theme/mcolors.dart';
+import 'package:pick_u_driver/utils/pulsing_marker_generator.dart';
 
 class MapService extends GetxService {
   static MapService get to => Get.find();
@@ -26,6 +27,12 @@ class MapService extends GetxService {
   BitmapDescriptor? _userMarkerIcon;
   BitmapDescriptor? _driverMarkerIcon;
   BitmapDescriptor? _pointsMarkerIcon;
+
+  // Pulsing animation variables
+  Timer? _pulseTimer;
+  bool _isPulsingEnabled = false;
+  double _currentPulseRadius = 15.0;
+  LatLng? _pulsingMarkerPosition;
 
   // Driver animation variables with route following
   List<LatLng> _currentRoutePolyline = [];
@@ -48,8 +55,8 @@ class MapService extends GetxService {
       print(' SAHAr Loading custom marker icons...');
 
       _userMarkerIcon = await BitmapDescriptor.asset(
-        const ImageConfiguration(size: Size(48, 48)),
-        'assets/img/user.png',
+        const ImageConfiguration(size: Size(30, 58)),
+        'assets/img/taxi.png',
       );
       print(' SAHAr User marker icon loaded successfully');
 
@@ -64,6 +71,7 @@ class MapService extends GetxService {
         'assets/img/points.png',
       );
       print(' SAHAr Points marker icon loaded successfully');
+
 
     } catch (e) {
       print(' SAHAr Error loading custom marker icons: $e');
@@ -82,6 +90,15 @@ class MapService extends GetxService {
     required LocationData? dropoffLocation,
     required List<LocationData> additionalStops,
   }) async {
+    // Ensure custom markers are loaded before creating route markers
+    if (_pointsMarkerIcon == null) {
+      print('⚠️ SAHAr Points marker is NULL, loading now...');
+      await _initializeCustomMarkers();
+      print('✅ SAHAr After init - Points marker is: ${_pointsMarkerIcon != null ? "LOADED" : "STILL NULL"}');
+    } else {
+      print('✅ SAHAr Points marker already loaded!');
+    }
+
     markers.clear();
     polylines.clear();
     isLoadingRoute.value = true;
@@ -90,14 +107,16 @@ class MapService extends GetxService {
       List<LatLng> routePoints = [];
       List<LatLng> waypoints = [];
 
-      // Create pickup marker
+      // Create pickup marker with custom image or navy fallback
       if (pickupLocation != null) {
         LatLng pickupLatLng = LatLng(pickupLocation.latitude, pickupLocation.longitude);
+
+        print('📍 SAHAr Creating PICKUP marker with icon: ${_pointsMarkerIcon != null ? "CUSTOM ICON" : "DEFAULT FALLBACK"}');
 
         markers.add(Marker(
           markerId: const MarkerId('pickup'),
           position: pickupLatLng,
-          icon: _pointsMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon: _pointsMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(230.0), // Navy blue hue
           infoWindow: InfoWindow(
             title: 'Pickup Location',
             snippet: pickupLocation.address,
@@ -113,10 +132,12 @@ class MapService extends GetxService {
         if (stop.address.isNotEmpty && stop.latitude != 0 && stop.longitude != 0) {
           LatLng stopLatLng = LatLng(stop.latitude, stop.longitude);
 
+          print('📍 SAHAr Creating STOP ${i + 1} marker with icon: ${_pointsMarkerIcon != null ? "CUSTOM ICON" : "DEFAULT FALLBACK"}');
+
           markers.add(Marker(
             markerId: MarkerId('stop_$i'),
             position: stopLatLng,
-            icon: _pointsMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+            icon: _pointsMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(230.0), // Navy blue hue
             infoWindow: InfoWindow(
               title: 'Stop ${i + 1}',
               snippet: stop.address,
@@ -128,15 +149,17 @@ class MapService extends GetxService {
         }
       }
 
-      // Create dropoff marker
+      // Create dropoff marker with custom image or navy fallback
       LatLng? dropoffLatLng;
       if (dropoffLocation != null) {
         dropoffLatLng = LatLng(dropoffLocation.latitude, dropoffLocation.longitude);
 
+        print('📍 SAHAr Creating DROPOFF marker with icon: ${_pointsMarkerIcon != null ? "CUSTOM ICON" : "DEFAULT FALLBACK"}');
+
         markers.add(Marker(
           markerId: const MarkerId('dropoff'),
           position: dropoffLatLng,
-          icon: _pointsMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          icon: _pointsMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(230.0), // Navy blue hue
           infoWindow: InfoWindow(
             title: 'Dropoff Location',
             snippet: dropoffLocation.address,
@@ -217,7 +240,7 @@ class MapService extends GetxService {
           destination: routePoints[i + 1],
         );
 
-        Color segmentColor = i == 0 ? Colors.blue : Colors.orange;
+        Color segmentColor = i == 0 ? MColor.primaryNavy : MColor.primaryNavy.withOpacity(0.7);
         List<PatternItem> patterns = i == 0 ? [] : [PatternItem.dash(10), PatternItem.gap(5)];
 
         polylines.add(Polyline(
@@ -284,13 +307,13 @@ class MapService extends GetxService {
     }
 
     if (_previousDriverLocation != newLocation) {
-      _startUltraSmoothDriverAnimation(_previousDriverLocation!, newLocation, driverName);
+      _startDriverAnimationWithRouteFollowing(_previousDriverLocation!, newLocation, driverName);
       _previousDriverLocation = newLocation;
     }
   }
 
-  // REPLACE your existing _startDriverAnimationWithRouteFollowing method with this:
-  void _startUltraSmoothDriverAnimation(LatLng fromLocation, LatLng toLocation, String driverName) {
+  /// Driver animation with route following
+  void _startDriverAnimationWithRouteFollowing(LatLng fromLocation, LatLng toLocation, String driverName) {
     if (_animationTimer?.isActive ?? false) {
       _animationTimer?.cancel();
     }
@@ -298,10 +321,10 @@ class MapService extends GetxService {
     _isAnimating = true;
     _currentAnimationStep = 0;
 
-    // Create interpolation points for ultra-smooth movement
+    // Create interpolation points for smooth movement
     _createInterpolationPoints(fromLocation, toLocation);
 
-    // Higher frequency timer for smoother animation (16ms ≈ 60fps)
+    // Timer for animation
     _animationTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
       _currentAnimationStep++;
 
@@ -320,12 +343,12 @@ class MapService extends GetxService {
         double finalBearing = _getBearingForLocation(toLocation);
         _createDriverMarkerWithRotation(toLocation, driverName, finalBearing);
 
-        print(' SAHAr Ultra-smooth driver animation completed');
+        print(' SAHAr Driver animation completed');
       }
     });
   }
 
-  // ADD these new helper methods:
+  /// Create interpolation points for smooth movement
   void _createInterpolationPoints(LatLng from, LatLng to) {
     _interpolationPoints.clear();
 
@@ -558,7 +581,7 @@ class MapService extends GetxService {
   }
 
   /// Create pickup marker
-  void _createPickupMarker(LocationData pickupLocation) {
+  Future<void> _createPickupMarker(LocationData pickupLocation) async {
     final pickupMarker = Marker(
       markerId: const MarkerId('pickup_location'),
       position: LatLng(pickupLocation.latitude, pickupLocation.longitude),
@@ -566,11 +589,28 @@ class MapService extends GetxService {
         title: 'Pickup Location',
         snippet: pickupLocation.address,
       ),
-      icon: _pointsMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      icon: _pointsMarkerIcon ?? await _createNavyMarker(),
     );
 
     markers.removeWhere((marker) => marker.markerId.value == 'pickup_location');
     markers.add(pickupMarker);
+  }
+
+  /// Create a custom navy marker as fallback
+  Future<BitmapDescriptor> _createNavyMarker() async {
+    try {
+      // Load custom navy marker from assets
+      final navyMarker = await BitmapDescriptor.fromAssetImage(
+        const ImageConfiguration(size: Size(48, 48)),
+        'assets/img/points.png',
+      );
+      print(' SAHAr Navy marker created from assets/img/points.png');
+      return navyMarker;
+    } catch (e) {
+      print(' SAHAr Error loading navy marker: $e');
+      // Fallback to navy blue hue if image fails to load
+      return BitmapDescriptor.defaultMarkerWithHue(230.0);
+    }
   }
 
   /// Fit map to show multiple locations
@@ -649,6 +689,107 @@ class MapService extends GetxService {
     markers.removeWhere((marker) => marker.markerId.value == 'user_location');
     markers.add(userMarker);
     print(' SAHAr User location marker added. Total markers: ${markers.length}');
+  }
+
+  /// Start pulsing animation for user marker
+  void startPulsingUserMarker() {
+    if (_pulseTimer?.isActive ?? false) {
+      _pulseTimer?.cancel();
+    }
+
+    _isPulsingEnabled = true;
+    _currentPulseRadius = 15.0;
+
+    // Store the current marker position
+    final currentMarker = markers.firstWhere(
+      (marker) => marker.markerId.value == 'user_location',
+      orElse: () => Marker(markerId: const MarkerId(''), position: LatLng(0, 0)),
+    );
+
+    if (currentMarker.markerId.value.isEmpty) {
+      print(' SAHAr No user marker found to animate');
+      return;
+    }
+
+    _pulsingMarkerPosition = currentMarker.position;
+
+    // Create pulsing animation with slower speed (100ms intervals)
+    _pulseTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (!_isPulsingEnabled || _pulsingMarkerPosition == null) {
+        timer.cancel();
+        return;
+      }
+
+      _updatePulsingMarker();
+    });
+
+    print(' SAHAr Started pulsing animation for user marker');
+  }
+
+  /// Update the pulsing marker with current animation frame
+  Future<void> _updatePulsingMarker() async {
+    try {
+      // Animate pulse radius from 15 to 60 for bigger animation
+      _currentPulseRadius += 1.0;
+      if (_currentPulseRadius > 60.0) {
+        _currentPulseRadius = 15.0; // Reset to start
+      }
+
+      // Calculate pulse opacity (fade out as radius increases)
+      double pulseOpacity = 1.0 - ((_currentPulseRadius - 15.0) / 45.0);
+      pulseOpacity = pulseOpacity.clamp(0.3, 0.8);
+
+      // Generate new pulsing marker
+      BitmapDescriptor pulsingMarker = await PulsingMarkerGenerator.createPulsingTaxiMarker(
+        pulseRadius: _currentPulseRadius,
+        pulseColor: MColor.primaryNavy,
+        pulseOpacity: pulseOpacity,
+      );
+
+      // Update marker on map
+      markers.removeWhere((marker) => marker.markerId.value == 'user_location');
+      markers.add(Marker(
+        markerId: const MarkerId('user_location'),
+        position: _pulsingMarkerPosition!,
+        icon: pulsingMarker,
+        infoWindow: const InfoWindow(
+          title: 'Your Location',
+          snippet: 'Current location',
+        ),
+      ));
+
+    } catch (e) {
+      print(' SAHAr Error updating pulsing marker: $e');
+      // Fallback to normal marker
+      _showNormalUserMarker();
+    }
+  }
+
+  /// Show normal user marker without pulsing
+  void _showNormalUserMarker() {
+    if (_pulsingMarkerPosition == null) return;
+
+    markers.removeWhere((marker) => marker.markerId.value == 'user_location');
+    markers.add(Marker(
+      markerId: const MarkerId('user_location'),
+      position: _pulsingMarkerPosition!,
+      icon: _userMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+      infoWindow: const InfoWindow(
+        title: 'Your Location',
+        snippet: 'Current location',
+      ),
+    ));
+  }
+
+  /// Stop pulsing animation for user marker
+  void stopPulsingUserMarker() {
+    _isPulsingEnabled = false;
+    _pulseTimer?.cancel();
+
+    print(' SAHAr Stopped pulsing animation for user marker');
+
+    // Reset to normal marker icon
+    _showNormalUserMarker();
   }
 
   @override

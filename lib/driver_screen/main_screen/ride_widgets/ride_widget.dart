@@ -178,99 +178,101 @@ class RideWidget extends StatelessWidget {
           const SizedBox(height: 12),
 
           // ── Fare + Action Button
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: LinearGradient(
-                      colors: [
-                        MColor.primaryNavy.withOpacity(0.05),
-                        MColor.primaryNavy.withOpacity(0.03)
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    border: Border.all(
-                      color: MColor.primaryNavy.withOpacity(0.08),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.payments_rounded,
-                          color: MColor.primaryNavy.withOpacity(0.8), size: 18),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          "\$${ride.fareFinal.toStringAsFixed(2)}"
-                              "${(ride.tip != null && ride.tip! > 0) ? " + \$${ride.tip!.toStringAsFixed(2)} Tip" : ""}",
-                          style: TextStyle(
-                            color: MColor.primaryNavy,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+      // Replace the fare display section in RideWidget with this:
+
+// ── Fare + Action Button
+      Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  colors: [
+                    MColor.primaryNavy.withOpacity(0.05),
+                    MColor.primaryNavy.withOpacity(0.03)
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border.all(
+                  color: MColor.primaryNavy.withOpacity(0.08),
+                  width: 1,
                 ),
               ),
-              const SizedBox(width: 10),
-              Obx(() {
-                if (!(rideController.isOnStop.value || isInProgress)) {
-                  return const SizedBox.shrink();
-                }
-                return ElevatedButton(
-                  onPressed: rideController.isProcessingRequest.value
-                      ? null
-                      : () => rideController
-                      .toggleRideStatus(ride.rideId ?? ''),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: MColor.primaryNavy,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  Icon(
+                      Icons.payments_rounded,
+                      color: MColor.primaryNavy.withOpacity(0.8),
+                      size: 18
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      // Use fareEstimate for display, fallback to fareFinal
+                      "\$${(ride.fareEstimate ?? ride.fareFinal).toStringAsFixed(2)}"
+                          "${(ride.tip != null && ride.tip! > 0) ? " + \$${ride.tip!.toStringAsFixed(2)} Tip" : ""}",
+                      style: TextStyle(
+                        color: MColor.primaryNavy,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
-                  child: rideController.isProcessingRequest.value
-                      ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                      : Row(
-                    children: [
-                      Icon(
-                        rideController.isOnStop.value
-                            ? Icons.play_arrow_rounded
-                            : Icons.pause_rounded,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        rideController.isOnStop.value
-                            ? "Resume"
-                            : "Pause",
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
+                ],
+              ),
+            ),
           ),
+          const SizedBox(width: 10),
+          Obx(() {
+            if (!(rideController.isOnStop.value || isInProgress)) {
+              return const SizedBox.shrink();
+            }
+            return ElevatedButton(
+              onPressed: rideController.isProcessingRequest.value
+                  ? null
+                  : () => rideController.toggleRideStatus(ride.rideId ?? ''),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: MColor.primaryNavy,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: rideController.isProcessingRequest.value
+                  ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+                  : Row(
+                children: [
+                  Icon(
+                    rideController.isOnStop.value
+                        ? Icons.play_arrow_rounded
+                        : Icons.pause_rounded,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    rideController.isOnStop.value ? "Resume" : "Pause",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
         ],
       ),
     );

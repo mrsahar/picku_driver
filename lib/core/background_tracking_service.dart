@@ -8,6 +8,7 @@ import 'package:pick_u_driver/core/location_service.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/driver_screen/widget/modern_payment_dialog.dart';
 import 'package:pick_u_driver/models/ride_assignment_model.dart';
+import 'package:pick_u_driver/routes/app_routes.dart';
 import 'package:signalr_core/signalr_core.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -146,6 +147,237 @@ class BackgroundTrackingService extends GetxService {
     }
   }
 
+
+  void showPaymentSuccessPopup({required double fareFinal, required double tip}) {
+    final bool hasTip = tip > 0;
+    final double total = fareFinal + tip;
+
+    Get.dialog(
+      PopScope(
+        canPop: false,
+        child: Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Success Icon
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check_circle,
+                    size: 50,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Title
+                Text(
+                  'Payment Received!',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: MColor.primaryNavy,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Subtitle
+                Text(
+                  'Payment has been successfully completed',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: MColor.primaryNavy.withOpacity(0.6),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+
+                // Payment Details
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: MColor.primaryNavy.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: MColor.primaryNavy.withOpacity(0.1),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      // Fare
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Ride Fare',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: MColor.primaryNavy.withOpacity(0.7),
+                            ),
+                          ),
+                          Text(
+                            '\$${fareFinal.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: MColor.primaryNavy,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Tip (if exists)
+                      if (hasTip) ...[
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.star,
+                                  size: 16,
+                                  color: Colors.amber.shade700,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Tip',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: MColor.primaryNavy.withOpacity(0.7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              '\$${tip.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Divider(
+                          color: MColor.primaryNavy.withOpacity(0.1),
+                          height: 1,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
+                      // Total
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Total Earning',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: MColor.primaryNavy,
+                            ),
+                          ),
+                          Text(
+                            '\$${total.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: MColor.primaryNavy,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    // OK Button
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Get.back(); // Close popup
+                          _resetRide(); // Clear everything
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: MColor.primaryNavy.withOpacity(0.1),
+                          foregroundColor: MColor.primaryNavy,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: MColor.primaryNavy.withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: const Text(
+                          'OK',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    // View Earnings Button
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Get.back(); // Close popup
+                          _resetRide(); // Clear everything
+                          Get.toNamed(AppRoutes.EarningSCREEN); // Navigate to earnings
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: MColor.primaryNavy,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'View Earnings',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    );
+  }
+
   /// Set up all SignalR event handlers
   void _setupConnectionHandlers() {
     if (_hubConnection == null) return;
@@ -216,19 +448,19 @@ class BackgroundTrackingService extends GetxService {
         }
       }
     });
-
+// Update the PaymentCompleted handler in BackgroundTrackingService
+// Replace the existing handler with this:
 
     _hubConnection!.on('PaymentCompleted', (List<Object?>? arguments) {
       if (arguments != null && arguments.isNotEmpty) {
         try {
           final paymentData = arguments[0] as Map<String, dynamic>;
           String rideId = paymentData['rideId']?.toString() ?? '';
-          String message = paymentData['message']?.toString() ?? '';
 
           print('💰 SAHAr Payment data received: $paymentData');
 
           // Update the current ride with payment info
-          if (currentRide.value != null) {
+          if (currentRide.value != null && currentRide.value!.rideId == rideId) {
             // Parse tip value properly
             double tip = 0.0;
             if (paymentData['tip'] != null) {
@@ -247,6 +479,7 @@ class BackgroundTrackingService extends GetxService {
             final updatedRideData = {
               'rideId': currentRide.value!.rideId,
               'rideType': currentRide.value!.rideType,
+              'fareEstimate': currentRide.value!.fareEstimate,
               'fareFinal': currentRide.value!.fareFinal,
               'createdAt': currentRide.value!.createdAt.toIso8601String(),
               'status': 'Completed',
@@ -272,37 +505,38 @@ class BackgroundTrackingService extends GetxService {
 
             print('💰 SAHAr Creating new ride assignment with payment info');
 
-            // CRITICAL: Force reactive update by setting to null first, then updating
-            // This ensures GetX detects the change
-            currentRide.value = null;
+            // Update ride with payment info
+            currentRide.value = RideAssignment.fromJson(updatedRideData);
+            paymentCompleted.value = true;
+            isWaitingForPayment.value = false;
 
-            // Update after short delay to ensure GetX processes the null value
-            Future.delayed(const Duration(milliseconds: 100), () {
-              currentRide.value = RideAssignment.fromJson(updatedRideData);
+            print('💰 SAHAr ✅ Ride updated successfully!');
+            print('   - Payment: ${currentRide.value!.payment}');
+            print('   - Tip: \$${currentRide.value!.tip?.toStringAsFixed(2) ?? "0.00"}');
+            print('   - FareFinal: \$${currentRide.value!.fareFinal.toStringAsFixed(2)}');
 
-              print('💰 SAHAr ✅ Ride updated successfully!');
-              print('   - Payment: ${currentRide.value!.payment}');
-              print('   - Tip: \$${currentRide.value!.tip?.toStringAsFixed(2) ?? "0.00"}');
-              print('   - Total: \$${(currentRide.value!.fareFinal + (currentRide.value!.tip ?? 0)).toStringAsFixed(2)}');
+            // Clear all UI elements before showing payment popup
+            _clearAllUIBeforePaymentPopup();
 
-              // Update flags - this will trigger bottom sheet to update
-              paymentCompleted.value = true;
-              isWaitingForPayment.value = false;
-
-              // NO snackbar here - the bottom sheet will update automatically
-              print('💰 SAHAr Bottom sheet should update now with payment info');
+            // Show payment success popup after clearing UI
+            Future.delayed(const Duration(milliseconds: 300), () {
+              showPaymentSuccessPopup(
+                fareFinal: currentRide.value!.fareFinal,
+                tip: currentRide.value!.tip ?? 0,
+              );
             });
-          } else {
-            print('⚠️ SAHAr Cannot update payment - no current ride');
-          }
 
-          print('💰 SAHAr Payment received: $message for ride: $rideId');
+            print('💰 SAHAr Payment popup shown');
+          } else {
+            print('⚠️ SAHAr Cannot update payment - no current ride or ride ID mismatch');
+          }
         } catch (e) {
           print('❌ SAHAr Error parsing payment: $e');
           print('❌ SAHAr Stack trace: ${StackTrace.current}');
         }
       }
     });
+
 
     // ===== DRIVER STATUS EVENTS =====
     _hubConnection!.on('DriverStatusChanged', (List<Object?>? arguments) {
@@ -477,23 +711,55 @@ class BackgroundTrackingService extends GetxService {
   void _handleRideStatusUpdate(Map<String, dynamic> statusData) {
     try {
       final ride = RideAssignment.fromJson(statusData);
+
+      // Check if this is a payment completion update
+      final wasWaitingForPayment = isWaitingForPayment.value;
+      final hasPaymentCompleted = ride.payment == 'Successful' && ride.status == 'Completed';
+
+      print('🔄 SAHAr Status update received:');
+      print('   - Status: ${ride.status}');
+      print('   - Payment: ${ride.payment}');
+      print('   - Was waiting: $wasWaitingForPayment');
+      print('   - Payment completed: $hasPaymentCompleted');
+
+      // Update current ride
       currentRide.value = ride;
       rideStatus.value = ride.status;
       currentRideId.value = ride.rideId;
+
+      // If payment just completed while we were waiting
+      if (wasWaitingForPayment && hasPaymentCompleted && showPaymentDialog.value) {
+        print('💰 SAHAr Payment completed! Showing popup...');
+
+        // Update payment flags
+        paymentCompleted.value = true;
+        isWaitingForPayment.value = false;
+
+        // Close the bottom sheet first
+        Get.back();
+
+        // Show payment success popup
+        showPaymentSuccessPopup(
+          fareFinal: ride.fareFinal,
+          tip: ride.tip ?? 0,
+        );
+
+        return; // Don't update UI for ride status
+      }
+
+      // Normal status update (not payment completion)
       _updateUIForRideStatus(ride);
+
       print('🔄 SAHAr Ride status: ${ride.status}');
     } catch (e) {
       print('❌ SAHAr Error handling status: $e');
     }
   }
 
-  /// Show ride notification
-  /// Show ride notification - Replace your existing method
   void _showRideNotification(RideAssignment ride) {
-    // Don't show notification if payment dialog is showing
-    // (payment completion will be shown in the bottom sheet)
-    if (showPaymentDialog.value && ride.status == 'Completed') {
-      print('🔕 SAHAr Skipping notification - payment dialog is active');
+    // Don't show notification if we're already handling payment completion
+    if (ride.status == 'Completed' && ride.payment == 'Successful' && paymentCompleted.value) {
+      print('🔕 SAHAr Skipping notification - payment already completed');
       return;
     }
 
@@ -519,12 +785,17 @@ class BackgroundTrackingService extends GetxService {
         icon = Icons.directions_car;
         break;
       case 'Completed':
-      // Only show this if payment dialog is NOT active
-        title = 'Ride Completed';
-        message = 'Waiting for payment...';
-        bgColor = Colors.green.shade100;
-        textColor = Colors.green.shade800;
-        icon = Icons.check_circle;
+        // Only show notification if payment is not yet successful
+        if (ride.payment != 'Successful') {
+          title = 'Ride Completed';
+          message = 'Waiting for payment...';
+          bgColor = Colors.green.shade100;
+          textColor = Colors.green.shade800;
+          icon = Icons.check_circle;
+        } else {
+          // Payment is successful, don't show notification as popup will handle it
+          return;
+        }
         break;
     }
 
@@ -659,36 +930,67 @@ class BackgroundTrackingService extends GetxService {
     }
   }
 
-  /// Show completed ride
-  /// Show completed ride - Replace your existing method with this
   void _showCompletedRide(RideAssignment ride) {
     routePolylines.clear();
     rideMarkers.clear();
 
-    // Set waiting for payment state
-    isWaitingForPayment.value = true;
-    paymentCompleted.value = false;
-    showPaymentDialog.value = true;
+    print('💰 SAHAr _showCompletedRide called for ride: ${ride.rideId}');
+    print('💰 SAHAr Current state: payment=${ride.payment}, showPaymentDialog=${showPaymentDialog.value}, paymentCompleted=${paymentCompleted.value}');
 
-    print('💰 SAHAr Showing payment bottom sheet for ride: ${ride.rideId}');
+    // Check if payment is already successful (in case we receive Completed with payment in one go)
+    final hasPayment = ride.payment == 'Successful';
 
-    // Show the modern payment bottom sheet (no ride parameter - it observes currentRide)
-    Get.bottomSheet(
-      ModernPaymentBottomSheet(
-        onDismiss: () {
-          print('💰 SAHAr Payment bottom sheet dismissed');
-          _resetRide();
-          isWaitingForPayment.value = false;
-          paymentCompleted.value = false;
-          showPaymentDialog.value = false;
-          Get.back();
-        },
-      ),
-      isDismissible: false,
-      enableDrag: false,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-    );
+    if (hasPayment) {
+      // Payment already completed, show popup directly
+      print('💰 SAHAr Payment already completed, showing popup directly');
+
+      // Set completion flags
+      paymentCompleted.value = true;
+      isWaitingForPayment.value = false;
+
+      // Clear all UI elements before showing payment popup
+      _clearAllUIBeforePaymentPopup();
+
+      // Show popup after comprehensive UI cleanup
+      Future.delayed(const Duration(milliseconds: 300), () {
+        showPaymentSuccessPopup(
+          fareFinal: ride.fareFinal,
+          tip: ride.tip ?? 0,
+        );
+      });
+
+      return;
+    }
+
+    // Only show bottom sheet if we haven't shown anything yet AND no payment
+    if (!showPaymentDialog.value && !paymentCompleted.value && !hasPayment) {
+      // Reset all payment-related flags first
+      isWaitingForPayment.value = false;
+      paymentCompleted.value = false;
+
+      // Set waiting for payment state
+      isWaitingForPayment.value = true;
+      showPaymentDialog.value = true;
+
+      print('💰 SAHAr Showing payment bottom sheet for ride: ${ride.rideId}');
+      print('💰 SAHAr Ride status: ${ride.status}, Payment: ${ride.payment}');
+
+      // Show the waiting bottom sheet
+      Get.bottomSheet(
+        ModernPaymentBottomSheet(
+          onDismiss: () {
+            print('💰 SAHAr Payment bottom sheet dismissed');
+            _resetRide();
+          },
+        ),
+        isDismissible: false,
+        enableDrag: false,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+      );
+    } else {
+      print('💰 SAHAr Skipping bottom sheet - showPaymentDialog=${showPaymentDialog.value}, paymentCompleted=${paymentCompleted.value}, hasPayment=$hasPayment');
+    }
   }
 
   /// Reset ride state
@@ -1019,5 +1321,38 @@ class BackgroundTrackingService extends GetxService {
     stopBackgroundService();
     _stopReconnectionTimer();
     super.onClose();
+  }
+
+  /// Clear all UI elements before showing payment popup
+  void _clearAllUIBeforePaymentPopup() {
+    print('🧹 SAHAr Clearing all UI elements before payment popup');
+
+    // Close any open bottom sheets
+    if (Get.isBottomSheetOpen ?? false) {
+      Get.back();
+      print('💰 SAHAr Bottom sheet closed');
+    }
+
+    // Close any open dialogs (except the payment popup we're about to show)
+    while (Get.isDialogOpen ?? false) {
+      Get.back();
+      print('💰 SAHAr Dialog closed');
+    }
+
+    // Clear ride-related UI elements
+    routePolylines.clear();
+    rideMarkers.clear();
+
+    // Reset ride widget state by clearing current ride temporarily
+    final tempRide = currentRide.value;
+    currentRide.value = null;
+    rideStatus.value = 'Payment Processing...';
+
+    // Small delay to ensure UI updates, then restore ride for payment popup
+    Future.delayed(const Duration(milliseconds: 50), () {
+      currentRide.value = tempRide;
+    });
+
+    print('🧹 SAHAr All UI elements cleared');
   }
 }

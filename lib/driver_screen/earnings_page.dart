@@ -11,9 +11,9 @@ class EarningsPage extends GetView<EarningsController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        title: const Text('Earnings'),
+        title: const Text('Earnings', style: TextStyle(fontWeight: FontWeight.w600)),
         backgroundColor: MColor.primaryNavy,
         elevation: 0,
         centerTitle: true,
@@ -36,12 +36,14 @@ class EarningsPage extends GetView<EarningsController> {
           color: MColor.primaryNavy,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
             child: Column(
               children: [
                 _buildSummaryCards(),
-                const SizedBox(height: 24),
-                _buildTransactionsList(),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: _buildTransactionsList(),
+                ),
               ],
             ),
           ),
@@ -54,55 +56,68 @@ class EarningsPage extends GetView<EarningsController> {
     final data = controller.earningsData.value;
     if (data == null) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // --- Top Row (Paid & Pending) ---
-        Row(
-          children: [
-            Expanded(
-              child: _buildSummaryCard(
-                title: 'Paid',
-                amount: controller.formatCurrency(data.paidAmount),
-                highlight: true,
-                icon: Icons.check_circle_rounded,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: MColor.primaryNavy.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // --- Top Row (Paid & Pending) ---
+          Row(
+            children: [
+              Expanded(
+                child: _buildSummaryCard(
+                  title: 'Paid',
+                  amount: controller.formatCurrency(data.paidAmount),
+                  highlight: true,
+                  icon: Icons.check_circle_rounded,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildSummaryCard(
-                title: 'Pending',
-                amount: controller.formatCurrency(data.pendingPayment),
-                highlight: true,
-                icon: Icons.pending_actions_rounded,
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSummaryCard(
+                  title: 'Pending',
+                  amount: controller.formatCurrency(data.pendingPayment),
+                  highlight: true,
+                  icon: Icons.pending_actions_rounded,
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
 
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
 
-        // --- Bottom Row (Total Earnings & Trips) ---
-        Row(
-          children: [
-            Expanded(
-              child: _buildSummaryCard(
-                title: 'Total Earned',
-                amount: controller.formatCurrency(data.totalPayment),
-                icon: Icons.account_balance_wallet_rounded,
+          // --- Bottom Row (Total Earnings & Trips) ---
+          Row(
+            children: [
+              Expanded(
+                child: _buildSummaryCard(
+                  title: 'Total Earned',
+                  amount: controller.formatCurrency(data.totalPayment),
+                  icon: Icons.account_balance_wallet_rounded,
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildSummaryCard(
-                title: 'Trips',
-                amount: data.totalTrips.toString(),
-                icon: Icons.directions_car_rounded,
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSummaryCard(
+                  title: 'Trips',
+                  amount: data.totalTrips.toString(),
+                  icon: Icons.directions_car_rounded,
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -117,16 +132,16 @@ class EarningsPage extends GetView<EarningsController> {
       decoration: BoxDecoration(
         color: highlight
             ? MColor.primaryNavy
-            : MColor.primaryNavy.withValues(alpha:0.08),
+            : MColor.primaryNavy.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: highlight
               ? Colors.transparent
-              : MColor.primaryNavy.withValues(alpha:0.1),
+              : MColor.primaryNavy.withValues(alpha: 0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: MColor.primaryNavy.withValues(alpha:highlight ? 0.2 : 0.05),
+            color: MColor.primaryNavy.withValues(alpha: highlight ? 0.2 : 0.05),
             blurRadius: 6,
             offset: const Offset(0, 3),
           ),
@@ -142,8 +157,8 @@ class EarningsPage extends GetView<EarningsController> {
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: highlight
-                        ? Colors.white.withValues(alpha:0.1)
-                        : MColor.primaryNavy.withValues(alpha:0.05),
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : MColor.primaryNavy.withValues(alpha: 0.05),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -157,8 +172,8 @@ class EarningsPage extends GetView<EarningsController> {
                 title,
                 style: TextStyle(
                   color: highlight
-                      ? Colors.white.withValues(alpha:0.9)
-                      : MColor.primaryNavy.withValues(alpha:0.8),
+                      ? Colors.white.withValues(alpha: 0.9)
+                      : MColor.primaryNavy.withValues(alpha: 0.8),
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -180,152 +195,367 @@ class EarningsPage extends GetView<EarningsController> {
     );
   }
 
-
   Widget _buildTransactionsList() {
     final data = controller.earningsData.value!;
+    final sortedPayments = List<PaymentTransaction>.from(data.payments)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Earning History',
-          style: TextStyle(
-            color: MColor.primaryNavy,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            'Transaction History',
+            style: TextStyle(
+              color: MColor.primaryNavy,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         ListView.builder(
-          itemCount: data.payments.length,
+          itemCount: sortedPayments.length,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemBuilder: (context, index) =>
-              _buildTransactionCard(data.payments[index]),
+              _buildTransactionCard(sortedPayments[index]),
         ),
       ],
     );
   }
 
   Widget _buildTransactionCard(PaymentTransaction payment) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(
-          color: MColor.primaryNavy.withValues(alpha:0.2),
-          width: 1.2,
-        ),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: MColor.primaryNavy.withValues(alpha:0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+    return GestureDetector(
+      onTap: () => _showTransactionDetails(payment),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: MColor.primaryNavy.withValues(alpha: 0.1),
+            width: 1,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top Row: Status + Method
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
+          boxShadow: [
+            BoxShadow(
+              color: MColor.primaryNavy.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: MColor.primaryNavy.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.account_balance_wallet_rounded,
+                color: MColor.primaryNavy,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.account_balance_wallet_outlined, size: 16),
-                  const SizedBox(width: 6),
                   Text(
                     controller.formatCurrency(payment.driverShare),
                     style: TextStyle(
                       color: MColor.primaryNavy,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${controller.formatDate(payment.createdAt)} • ${controller.formatTime(payment.createdAt)}',
+                    style: TextStyle(
+                      color: MColor.primaryNavy.withValues(alpha: 0.6),
+                      fontSize: 12,
                     ),
                   ),
                 ],
               ),
-              Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: MColor.primaryNavy.withValues(alpha:0.1),
-                  borderRadius: BorderRadius.circular(6),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: MColor.primaryNavy,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                payment.paymentStatus,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                 ),
-                child: Text(
-                  payment.paymentStatus,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTransactionDetails(PaymentTransaction payment) {
+    showModalBottomSheet(
+      context: Get.context!,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 20),
+              decoration: BoxDecoration(
+                color: MColor.primaryNavy.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Transaction Details',
+                    style: TextStyle(
+                      color: MColor.primaryNavy,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(
+              height: 32,
+              color: MColor.primaryNavy.withValues(alpha: 0.1),
+              thickness: 1,
+            ),
+            // Content
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                child: Column(
+                  children: [
+                    // Amount Display
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: MColor.primaryNavy,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Driver Share',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.8),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            controller.formatCurrency(payment.driverShare),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Payment Details
+                    _buildDetailItem(
+                      'Payment ID',
+                      payment.paymentId,
+                      Icons.receipt_long_rounded,
+                    ),
+                    _buildDetailItem(
+                      'Ride ID',
+                      payment.rideId,
+                      Icons.route_rounded,
+                    ),
+                    _buildDetailItem(
+                      'Payment Status',
+                      payment.paymentStatus,
+                      Icons.check_circle_rounded,
+                    ),
+                    _buildDetailItem(
+                      'Payment Method',
+                      payment.paymentMethod,
+                      Icons.payment_rounded,
+                    ),
+                    _buildDetailItem(
+                      'Date & Time',
+                      '${controller.formatDate(payment.createdAt)} at ${controller.formatTime(payment.createdAt)}',
+                      Icons.calendar_today_rounded,
+                    ),
+
+                    const SizedBox(height: 12),
+                    Divider(color: MColor.primaryNavy.withValues(alpha: 0.1)),
+                    const SizedBox(height: 12),
+
+                    // Amount Breakdown
+                    Text(
+                      'Amount Breakdown',
+                      style: TextStyle(
+                        color: MColor.primaryNavy,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    _buildAmountRow('Paid Amount', controller.formatCurrency(payment.paidAmount)),
+                    _buildAmountRow('Tip Amount', controller.formatCurrency(payment.tipAmount)),
+                    _buildAmountRow('Admin Share', controller.formatCurrency(payment.adminShare)),
+
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: MColor.primaryNavy.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Total Amount',
+                            style: TextStyle(
+                              color: MColor.primaryNavy,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            controller.formatCurrency(payment.paidAmount + payment.tipAmount),
+                            style: TextStyle(
+                              color: MColor.primaryNavy,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailItem(String label, String value, IconData icon) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: MColor.primaryNavy.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: MColor.primaryNavy.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: MColor.primaryNavy.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: MColor.primaryNavy,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: MColor.primaryNavy.withValues(alpha: 0.6),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
                   style: TextStyle(
                     color: MColor.primaryNavy,
-                    fontSize: 11,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Date + Time Row
-          Row(
-            children: [
-              Icon(Icons.calendar_today_outlined,
-                  size: 14, color: MColor.primaryNavy.withValues(alpha:0.7)),
-              const SizedBox(width: 6),
-              Text(
-                controller.formatDate(payment.createdAt),
-                style: TextStyle(
-                  color: MColor.primaryNavy.withValues(alpha:0.7),
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Icon(Icons.access_time,
-                  size: 14, color: MColor.primaryNavy.withValues(alpha:0.7)),
-              const SizedBox(width: 6),
-              Text(
-                controller.formatTime(payment.createdAt),
-                style: TextStyle(
-                  color: MColor.primaryNavy.withValues(alpha:0.7),
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 24, color: Color(0xFFEFEFEF)),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildDetailItem('Paid', controller.formatCurrency(payment.paidAmount)),
-              _buildDetailItem('Paid Via',payment.paymentMethod ),
-              _buildDetailItem('Tip', controller.formatCurrency(payment.tipAmount)),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDetailItem(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: MColor.primaryNavy.withValues(alpha:0.6),
-            fontSize: 11,
+  Widget _buildAmountRow(String label, String amount) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: MColor.primaryNavy.withValues(alpha: 0.7),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            color: MColor.primaryNavy,
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
+          Text(
+            amount,
+            style: TextStyle(
+              color: MColor.primaryNavy,
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -335,24 +565,35 @@ class EarningsPage extends GetView<EarningsController> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.receipt_long_rounded,
-              color: MColor.primaryNavy.withValues(alpha:0.2), size: 80),
-          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: MColor.primaryNavy.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.receipt_long_rounded,
+              color: MColor.primaryNavy.withValues(alpha: 0.4),
+              size: 64,
+            ),
+          ),
+          const SizedBox(height: 24),
           Text(
             'No Transactions Yet',
             style: TextStyle(
               color: MColor.primaryNavy,
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Your earnings will appear here once available.',
+            'Your earnings will appear here\nonce available.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: MColor.primaryNavy.withValues(alpha:0.6),
+              color: MColor.primaryNavy.withValues(alpha: 0.6),
               fontSize: 14,
+              height: 1.5,
             ),
           ),
         ],
@@ -366,14 +607,24 @@ class EarningsPage extends GetView<EarningsController> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline_rounded,
-              color: MColor.primaryNavy.withValues(alpha:0.4), size: 80),
-          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: MColor.primaryNavy.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.error_outline_rounded,
+              color: MColor.primaryNavy.withValues(alpha: 0.4),
+              size: 64,
+            ),
+          ),
+          const SizedBox(height: 24),
           Text(
             'Error Loading Earnings',
             style: TextStyle(
               color: MColor.primaryNavy,
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -382,7 +633,7 @@ class EarningsPage extends GetView<EarningsController> {
             controller.errorMessage.value,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: MColor.primaryNavy.withValues(alpha:0.6),
+              color: MColor.primaryNavy.withValues(alpha: 0.6),
               fontSize: 14,
             ),
           ),
@@ -391,12 +642,19 @@ class EarningsPage extends GetView<EarningsController> {
             onPressed: controller.refreshEarnings,
             style: ElevatedButton.styleFrom(
               backgroundColor: MColor.primaryNavy,
-              padding:
-              const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
             ),
             child: const Text(
               'Retry',
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
             ),
           ),
         ],
@@ -404,4 +662,3 @@ class EarningsPage extends GetView<EarningsController> {
     ),
   );
 }
-

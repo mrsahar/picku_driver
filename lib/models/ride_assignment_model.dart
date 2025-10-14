@@ -1,6 +1,7 @@
 class RideAssignment {
   final String rideId;
   final String rideType;
+  final double? fareEstimate; // Added fareEstimate
   final double fareFinal;
   final DateTime createdAt;
   final String status;
@@ -21,6 +22,7 @@ class RideAssignment {
   RideAssignment({
     required this.rideId,
     required this.rideType,
+    this.fareEstimate,
     required this.fareFinal,
     required this.createdAt,
     required this.status,
@@ -43,7 +45,10 @@ class RideAssignment {
     return RideAssignment(
       rideId: json['rideId'] ?? '',
       rideType: json['rideType'] ?? 'standard',
-      fareFinal: (json['fareFinal'] ?? 0).toDouble(),
+      fareEstimate: json['fareEstimate'] != null
+          ? (json['fareEstimate'] is num ? (json['fareEstimate'] as num).toDouble() : double.tryParse(json['fareEstimate'].toString()))
+          : null,
+      fareFinal: (json['fareFinal'] ?? json['fareEstimate'] ?? 0).toDouble(),
       createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
       status: json['status'] ?? 'Waiting',
       passengerId: json['passengerId'] ?? '',
@@ -60,9 +65,14 @@ class RideAssignment {
           .toList() ?? [],
       passengerCount: json['passengerCount'] ?? 1,
       payment: json['payment'],
-      tip: json['tip'],
+      tip: json['tip'] != null
+          ? (json['tip'] is num ? (json['tip'] as num).toDouble() : double.tryParse(json['tip'].toString()))
+          : null,
     );
   }
+
+  // Helper method to get the display fare
+  double get displayFare => fareEstimate ?? fareFinal;
 }
 
 class RideStop {

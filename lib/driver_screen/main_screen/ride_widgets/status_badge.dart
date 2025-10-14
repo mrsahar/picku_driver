@@ -94,7 +94,7 @@ class _RipplePainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
 
     final ripplePaint = Paint()
-      ..color = color.withOpacity(0.2)
+      ..color = color.withValues(alpha:0.2)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 
@@ -103,7 +103,7 @@ class _RipplePainter extends CustomPainter {
       final rippleProgress = (progress + i * 0.33) % 1.0;
       final radius = rippleProgress * 60;
       final opacity = (1 - rippleProgress).clamp(0.0, 1.0);
-      ripplePaint.color = color.withOpacity(0.2 * opacity);
+      ripplePaint.color = color.withValues(alpha:0.2 * opacity);
       canvas.drawCircle(center, radius, ripplePaint);
     }
   }

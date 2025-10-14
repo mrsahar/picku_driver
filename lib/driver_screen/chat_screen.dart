@@ -62,7 +62,7 @@ class ChatScreen extends GetView<ChatController> {
                 Text(
                   'Passenger',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha:0.8),
                     fontSize: 12,
                   ),
                 ),
@@ -93,7 +93,7 @@ class ChatScreen extends GetView<ChatController> {
       if (controller.isLoading.value) {
         return Container(
           padding: const EdgeInsets.all(8),
-          color: Colors.orange.withOpacity(0.1),
+          color: Colors.orange.withValues(alpha:0.1),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -118,7 +118,7 @@ class ChatScreen extends GetView<ChatController> {
       if (!controller.isConnected.value) {
         return Container(
           padding: const EdgeInsets.all(8),
-          color: Colors.red.withOpacity(0.1),
+          color: Colors.red.withValues(alpha:0.1),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -192,13 +192,13 @@ class ChatScreen extends GetView<ChatController> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: MColor.primaryNavy.withOpacity(0.1),
+              color: MColor.primaryNavy.withValues(alpha:0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.chat_bubble_outline,
               size: 40,
-              color: MColor.primaryNavy.withOpacity(0.5),
+              color: MColor.primaryNavy.withValues(alpha:0.5),
             ),
           ),
           const SizedBox(height: 16),
@@ -240,7 +240,7 @@ class ChatScreen extends GetView<ChatController> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: MColor.primaryNavy.withOpacity(0.1),
+                color: MColor.primaryNavy.withValues(alpha:0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -272,7 +272,7 @@ class ChatScreen extends GetView<ChatController> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha:0.05),
                     blurRadius: 5,
                     offset: const Offset(0, 2),
                   ),
@@ -296,7 +296,7 @@ class ChatScreen extends GetView<ChatController> {
                     message.dateTime.toTimeString(),
                     style: TextStyle(
                       color: isCurrentUser
-                          ? Colors.white.withOpacity(0.7)
+                          ? Colors.white.withValues(alpha:0.7)
                           : Colors.grey[600],
                       fontSize: 11,
                     ),
@@ -317,7 +317,7 @@ class ChatScreen extends GetView<ChatController> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),

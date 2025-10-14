@@ -1,7 +1,7 @@
 class RideAssignment {
   final String rideId;
   final String rideType;
-  final double fareEstimate;
+  final double fareFinal;
   final DateTime createdAt;
   final String status;
   final String passengerId;
@@ -15,11 +15,13 @@ class RideAssignment {
   final double dropoffLon;
   final List<RideStop> stops;
   final int passengerCount;
+  final String? payment;
+  final double? tip;
 
   RideAssignment({
     required this.rideId,
     required this.rideType,
-    required this.fareEstimate,
+    required this.fareFinal,
     required this.createdAt,
     required this.status,
     required this.passengerId,
@@ -33,13 +35,15 @@ class RideAssignment {
     required this.dropoffLon,
     required this.stops,
     required this.passengerCount,
+    this.payment,
+    this.tip,
   });
 
   factory RideAssignment.fromJson(Map<String, dynamic> json) {
     return RideAssignment(
       rideId: json['rideId'] ?? '',
       rideType: json['rideType'] ?? 'standard',
-      fareEstimate: (json['fareEstimate'] ?? 0).toDouble(),
+      fareFinal: (json['fareFinal'] ?? 0).toDouble(),
       createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
       status: json['status'] ?? 'Waiting',
       passengerId: json['passengerId'] ?? '',
@@ -55,6 +59,8 @@ class RideAssignment {
           ?.map((stop) => RideStop.fromJson(stop))
           .toList() ?? [],
       passengerCount: json['passengerCount'] ?? 1,
+      payment: json['payment'],
+      tip: json['tip'],
     );
   }
 }

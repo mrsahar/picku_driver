@@ -101,8 +101,8 @@ class BookingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cancellationColor = cancellationType == "Cancelled by You"
-        ? theme.colorScheme.primary.withOpacity(0.04)
-        : theme.colorScheme.error.withOpacity(0.04);
+        ? theme.colorScheme.primary.withValues(alpha:0.04)
+        : theme.colorScheme.error.withValues(alpha:0.04);
 
     final cancellationTextColor = cancellationType == "Cancelled by You"
         ? theme.colorScheme.primary

@@ -117,16 +117,16 @@ class EarningsPage extends GetView<EarningsController> {
       decoration: BoxDecoration(
         color: highlight
             ? MColor.primaryNavy
-            : MColor.primaryNavy.withOpacity(0.08),
+            : MColor.primaryNavy.withValues(alpha:0.08),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: highlight
               ? Colors.transparent
-              : MColor.primaryNavy.withOpacity(0.1),
+              : MColor.primaryNavy.withValues(alpha:0.1),
         ),
         boxShadow: [
           BoxShadow(
-            color: MColor.primaryNavy.withOpacity(highlight ? 0.2 : 0.05),
+            color: MColor.primaryNavy.withValues(alpha:highlight ? 0.2 : 0.05),
             blurRadius: 6,
             offset: const Offset(0, 3),
           ),
@@ -142,8 +142,8 @@ class EarningsPage extends GetView<EarningsController> {
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: highlight
-                        ? Colors.white.withOpacity(0.1)
-                        : MColor.primaryNavy.withOpacity(0.05),
+                        ? Colors.white.withValues(alpha:0.1)
+                        : MColor.primaryNavy.withValues(alpha:0.05),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -157,8 +157,8 @@ class EarningsPage extends GetView<EarningsController> {
                 title,
                 style: TextStyle(
                   color: highlight
-                      ? Colors.white.withOpacity(0.9)
-                      : MColor.primaryNavy.withOpacity(0.8),
+                      ? Colors.white.withValues(alpha:0.9)
+                      : MColor.primaryNavy.withValues(alpha:0.8),
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -213,13 +213,13 @@ class EarningsPage extends GetView<EarningsController> {
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(
-          color: MColor.primaryNavy.withOpacity(0.2),
+          color: MColor.primaryNavy.withValues(alpha:0.2),
           width: 1.2,
         ),
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: MColor.primaryNavy.withOpacity(0.05),
+            color: MColor.primaryNavy.withValues(alpha:0.05),
             blurRadius: 6,
             offset: const Offset(0, 3),
           ),
@@ -250,7 +250,7 @@ class EarningsPage extends GetView<EarningsController> {
                 padding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: MColor.primaryNavy.withOpacity(0.1),
+                  color: MColor.primaryNavy.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -269,23 +269,23 @@ class EarningsPage extends GetView<EarningsController> {
           Row(
             children: [
               Icon(Icons.calendar_today_outlined,
-                  size: 14, color: MColor.primaryNavy.withOpacity(0.7)),
+                  size: 14, color: MColor.primaryNavy.withValues(alpha:0.7)),
               const SizedBox(width: 6),
               Text(
                 controller.formatDate(payment.createdAt),
                 style: TextStyle(
-                  color: MColor.primaryNavy.withOpacity(0.7),
+                  color: MColor.primaryNavy.withValues(alpha:0.7),
                   fontSize: 12,
                 ),
               ),
               const SizedBox(width: 16),
               Icon(Icons.access_time,
-                  size: 14, color: MColor.primaryNavy.withOpacity(0.7)),
+                  size: 14, color: MColor.primaryNavy.withValues(alpha:0.7)),
               const SizedBox(width: 6),
               Text(
                 controller.formatTime(payment.createdAt),
                 style: TextStyle(
-                  color: MColor.primaryNavy.withOpacity(0.7),
+                  color: MColor.primaryNavy.withValues(alpha:0.7),
                   fontSize: 12,
                 ),
               ),
@@ -312,7 +312,7 @@ class EarningsPage extends GetView<EarningsController> {
         Text(
           label,
           style: TextStyle(
-            color: MColor.primaryNavy.withOpacity(0.6),
+            color: MColor.primaryNavy.withValues(alpha:0.6),
             fontSize: 11,
           ),
         ),
@@ -336,7 +336,7 @@ class EarningsPage extends GetView<EarningsController> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.receipt_long_rounded,
-              color: MColor.primaryNavy.withOpacity(0.2), size: 80),
+              color: MColor.primaryNavy.withValues(alpha:0.2), size: 80),
           const SizedBox(height: 16),
           Text(
             'No Transactions Yet',
@@ -351,7 +351,7 @@ class EarningsPage extends GetView<EarningsController> {
             'Your earnings will appear here once available.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: MColor.primaryNavy.withOpacity(0.6),
+              color: MColor.primaryNavy.withValues(alpha:0.6),
               fontSize: 14,
             ),
           ),
@@ -367,7 +367,7 @@ class EarningsPage extends GetView<EarningsController> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.error_outline_rounded,
-              color: MColor.primaryNavy.withOpacity(0.4), size: 80),
+              color: MColor.primaryNavy.withValues(alpha:0.4), size: 80),
           const SizedBox(height: 16),
           Text(
             'Error Loading Earnings',
@@ -382,7 +382,7 @@ class EarningsPage extends GetView<EarningsController> {
             controller.errorMessage.value,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: MColor.primaryNavy.withOpacity(0.6),
+              color: MColor.primaryNavy.withValues(alpha:0.6),
               fontSize: 14,
             ),
           ),

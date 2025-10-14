@@ -78,10 +78,10 @@ class ShiftApplicationPage extends StatelessWidget {
                 width: double.infinity,
                 padding: EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: MAppTheme.trackingOrange.withOpacity(0.1),
+                  color: MAppTheme.trackingOrange.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: MAppTheme.trackingOrange.withOpacity(0.3),
+                    color: MAppTheme.trackingOrange.withValues(alpha:0.3),
                     width: 1,
                   ),
                 ),
@@ -104,7 +104,7 @@ class ShiftApplicationPage extends StatelessWidget {
                     Text(
                       'Select the shift that works best for your schedule',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.7),
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -154,14 +154,14 @@ class ShiftApplicationPage extends StatelessWidget {
                         padding: EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: hasApplied
-                              ? Colors.grey.withOpacity(0.1)
+                              ? Colors.grey.withValues(alpha:0.1)
                               : isSelected
-                              ? MAppTheme.trackingOrange.withOpacity(0.1)
+                              ? MAppTheme.trackingOrange.withValues(alpha:0.1)
                               : Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: hasApplied
-                                ? Colors.grey.withOpacity(0.3)
+                                ? Colors.grey.withValues(alpha:0.3)
                                 : isSelected
                                 ? MAppTheme.trackingOrange
                                 : Theme.of(context).dividerColor,
@@ -175,9 +175,9 @@ class ShiftApplicationPage extends StatelessWidget {
                               height: 50,
                               decoration: BoxDecoration(
                                 color: hasApplied
-                                    ? Colors.grey.withOpacity(0.2)
+                                    ? Colors.grey.withValues(alpha:0.2)
                                     : isSelected
-                                    ? MAppTheme.trackingOrange.withOpacity(0.2)
+                                    ? MAppTheme.trackingOrange.withValues(alpha:0.2)
                                     : Theme.of(context).colorScheme.surface,
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -187,7 +187,7 @@ class ShiftApplicationPage extends StatelessWidget {
                                     ? controller.getShiftStatusColor(shift.shiftId)
                                     : isSelected
                                     ? MAppTheme.trackingOrange
-                                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                    : Theme.of(context).colorScheme.onSurface.withValues(alpha:0.6),
                                 size: 24,
                               ),
                             ),
@@ -204,7 +204,7 @@ class ShiftApplicationPage extends StatelessWidget {
                                           style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                             fontWeight: FontWeight.w600,
                                             color: hasApplied
-                                                ? Colors.grey.withOpacity(0.7)
+                                                ? Colors.grey.withValues(alpha:0.7)
                                                 : Theme.of(context).colorScheme.onSurface,
                                           ),
                                         ),
@@ -214,7 +214,7 @@ class ShiftApplicationPage extends StatelessWidget {
                                         Container(
                                           padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: controller.getShiftStatusColor(shift.shiftId)?.withOpacity(0.1),
+                                            color: controller.getShiftStatusColor(shift.shiftId)?.withValues(alpha:0.1),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(
@@ -230,7 +230,7 @@ class ShiftApplicationPage extends StatelessWidget {
                                         Container(
                                           padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: Colors.blue.withOpacity(0.1),
+                                            color: Colors.blue.withValues(alpha:0.1),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(
@@ -250,10 +250,10 @@ class ShiftApplicationPage extends StatelessWidget {
                                     shift.formattedTime,
                                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                       color: hasApplied
-                                          ? Colors.grey.withOpacity(0.6)
+                                          ? Colors.grey.withValues(alpha:0.6)
                                           : isSelected
                                           ? MAppTheme.trackingOrange
-                                          : Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                                          : Theme.of(context).colorScheme.onSurface.withValues(alpha:0.8),
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -262,8 +262,8 @@ class ShiftApplicationPage extends StatelessWidget {
                                     shift.formattedDate,
                                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: hasApplied
-                                          ? Colors.grey.withOpacity(0.5)
-                                          : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                          ? Colors.grey.withValues(alpha:0.5)
+                                          : Theme.of(context).colorScheme.onSurface.withValues(alpha:0.6),
                                     ),
                                   ),
                                   if (shift.description.isNotEmpty) ...[
@@ -275,7 +275,7 @@ class ShiftApplicationPage extends StatelessWidget {
                                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                         color: hasApplied
                                             ? controller.getShiftStatusColor(shift.shiftId)
-                                            : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                            : Theme.of(context).colorScheme.onSurface.withValues(alpha:0.6),
                                         fontWeight: hasApplied ? FontWeight.w500 : FontWeight.normal,
                                       ),
                                     ),
@@ -321,7 +321,7 @@ class ShiftApplicationPage extends StatelessWidget {
                     backgroundColor: (controller.selectedShift.value.isNotEmpty &&
                         controller.canApplyForShift(controller.selectedShift.value))
                         ? null
-                        : Colors.grey.withOpacity(0.3),
+                        : Colors.grey.withValues(alpha:0.3),
                   ),
                   child: controller.isSubmitting.value
                       ? SizedBox(
@@ -360,14 +360,14 @@ class ShiftApplicationPage extends StatelessWidget {
                     Icon(
                       Icons.info_outline,
                       size: 20,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.6),
                     ),
                     SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'Your application will be reviewed by our team. You will receive a notification once your shift request is approved or if any additional information is required.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha:0.7),
                         ),
                       ),
                     ),

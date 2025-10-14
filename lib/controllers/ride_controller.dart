@@ -75,7 +75,7 @@ class RideController extends GetxController {
         Get.snackbar(
           "Stop Requested",
           "Timer started for waiting time",
-          backgroundColor: MColor.primaryNavy.withOpacity(0.1),
+          backgroundColor: MColor.primaryNavy.withValues(alpha:0.1),
           colorText: MColor.primaryNavy,
           icon: Icon(Icons.pause_circle_filled, color: MColor.primaryNavy),
         );
@@ -84,7 +84,7 @@ class RideController extends GetxController {
         Get.snackbar(
           "Error",
           "Failed to request stop: ${response.statusText}",
-          backgroundColor: Colors.red.withOpacity(0.1),
+          backgroundColor: Colors.red.withValues(alpha:0.1),
           colorText: Colors.red,
           icon: const Icon(Icons.error, color: Colors.red),
         );
@@ -94,7 +94,7 @@ class RideController extends GetxController {
       Get.snackbar(
         "Error",
         "Network error: $e",
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha:0.1),
         colorText: Colors.red,
         icon: const Icon(Icons.error, color: Colors.red),
       );
@@ -130,7 +130,7 @@ class RideController extends GetxController {
         Get.snackbar(
           "Ride Resumed",
           "Total waiting time: $waitingTime",
-          backgroundColor: const Color(0xFF1A2A44).withOpacity(0.1),
+          backgroundColor: const Color(0xFF1A2A44).withValues(alpha:0.1),
           colorText: const Color(0xFF1A2A44),
           icon: const Icon(Icons.play_circle_filled, color: Color(0xFF1A2A44)),
         );
@@ -141,7 +141,7 @@ class RideController extends GetxController {
         Get.snackbar(
           "Error",
           "Failed to resume ride: ${response.statusText}",
-          backgroundColor: Colors.red.withOpacity(0.1),
+          backgroundColor: Colors.red.withValues(alpha:0.1),
           colorText: Colors.red,
           icon: const Icon(Icons.error, color: Colors.red),
         );
@@ -153,7 +153,7 @@ class RideController extends GetxController {
       Get.snackbar(
         "Error",
         "Network error: $e",
-        backgroundColor: Colors.red.withOpacity(0.1),
+        backgroundColor: Colors.red.withValues(alpha:0.1),
         colorText: Colors.red,
         icon: const Icon(Icons.error, color: Colors.red),
       );

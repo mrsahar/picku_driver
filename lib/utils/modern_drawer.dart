@@ -1,6 +1,3 @@
-// Modern Drawer Widget
-// File: lib/widgets/modern_drawer.dart
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
@@ -25,12 +22,6 @@ Widget buildModernDrawer(BuildContext context, bool isDark) {
             isDark: isDark,
             children: [
               _ModernMenuTile(
-                icon: LineAwesomeIcons.home_solid,
-                title: 'Home',
-                isDark: isDark,
-                onTap: () => Get.back(),
-              ),
-              _ModernMenuTile(
                 icon: LineAwesomeIcons.user_solid,
                 title: 'Profile',
                 isDark: isDark,
@@ -47,6 +38,12 @@ Widget buildModernDrawer(BuildContext context, bool isDark) {
                 title: 'Scheduled Rides',
                 isDark: isDark,
                 onTap: () => Get.toNamed(AppRoutes.scheduledRideHistory),
+              ),
+              _ModernMenuTile(
+                icon: LineAwesomeIcons.calendar_alt_solid,
+                title: 'Shifts',
+                isDark: isDark,
+                onTap: () => Get.toNamed(AppRoutes.shiftApplication),
               ),
             ],
           ),
@@ -66,12 +63,12 @@ Widget buildModernDrawer(BuildContext context, bool isDark) {
                 badgeColor: MColor.trackingOrange,
                 onTap: () => Get.toNamed(AppRoutes.EarningSCREEN),
               ),
-              _ModernMenuTile(
-                icon: LineAwesomeIcons.credit_card_solid,
-                title: 'Payment Methods',
-                isDark: isDark,
-                onTap: () {},
-              ),
+              // _ModernMenuTile(
+              //   icon: LineAwesomeIcons.credit_card_solid,
+              //   title: 'Payment Methods',
+              //   isDark: isDark,
+              //   onTap: () {},
+              // ),
             ],
           ),
 
@@ -182,14 +179,14 @@ Widget _buildDrawerHeader(BuildContext context, bool isDark) {
                         gradient: LinearGradient(
                           colors: [
                             MColor.trackingOrange,
-                            MColor.trackingOrange.withOpacity(0.7),
+                            MColor.trackingOrange.withValues(alpha:0.7),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: MColor.trackingOrange.withOpacity(0.3),
+                            color: MColor.trackingOrange.withValues(alpha:0.3),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -259,7 +256,7 @@ Widget _buildDrawerHeader(BuildContext context, bool isDark) {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 3),
                       decoration: BoxDecoration(
-                        color: MColor.trackingOrange.withOpacity(0.15),
+                        color: MColor.trackingOrange.withValues(alpha:0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -370,11 +367,11 @@ class _ModernMenuTileState extends State<_ModernMenuTile>
   @override
   Widget build(BuildContext context) {
     final bgColor = widget.isDark
-        ? Colors.white.withOpacity(0.05)
-        : Colors.grey.withOpacity(0.08);
+        ? Colors.white.withValues(alpha:0.05)
+        : Colors.grey.withValues(alpha:0.08);
     final hoverBgColor = widget.isDark
-        ? Colors.white.withOpacity(0.1)
-        : Colors.grey.withOpacity(0.12);
+        ? Colors.white.withValues(alpha:0.1)
+        : Colors.grey.withValues(alpha:0.12);
 
     return ScaleTransition(
       scale: _scaleAnimation,
@@ -388,11 +385,11 @@ class _ModernMenuTileState extends State<_ModernMenuTile>
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: widget.isLogout ? Colors.red.withOpacity(0.08) : bgColor,
+            color: widget.isLogout ? Colors.red.withValues(alpha:0.08) : bgColor,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: widget.isLogout
-                  ? Colors.red.withOpacity(0.2)
+                  ? Colors.red.withValues(alpha:0.2)
                   : Colors.transparent,
               width: 1,
             ),
@@ -403,7 +400,7 @@ class _ModernMenuTileState extends State<_ModernMenuTile>
               onTap: widget.onTap,
               borderRadius: BorderRadius.circular(12),
               hoverColor: hoverBgColor,
-              splashColor: MColor.trackingOrange.withOpacity(0.1),
+              splashColor: MColor.trackingOrange.withValues(alpha:0.1),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -418,8 +415,8 @@ class _ModernMenuTileState extends State<_ModernMenuTile>
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: widget.isLogout
-                            ? Colors.red.withOpacity(0.15)
-                            : MColor.trackingOrange.withOpacity(0.15),
+                            ? Colors.red.withValues(alpha:0.15)
+                            : MColor.trackingOrange.withValues(alpha:0.15),
                       ),
                       child: Icon(
                         widget.icon,

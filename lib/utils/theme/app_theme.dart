@@ -95,7 +95,7 @@ class MAppTheme {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: lightGrey,
-      hintStyle: TextStyle(color: primaryNavyBlue.withOpacity(0.6)),
+      hintStyle: TextStyle(color: primaryNavyBlue.withValues(alpha:0.6)),
       labelStyle: const TextStyle(color: primaryNavyBlue),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -103,7 +103,7 @@ class MAppTheme {
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: primaryNavyBlue.withOpacity(0.3)),
+        borderSide: BorderSide(color: primaryNavyBlue.withValues(alpha:0.3)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -155,9 +155,9 @@ class MAppTheme {
       }),
       trackColor: MaterialStateProperty.resolveWith((states) {
         if (states.contains(MaterialState.selected)) {
-          return trackingOrange.withOpacity(0.3);
+          return trackingOrange.withValues(alpha:0.3);
         }
-        return Colors.grey.withOpacity(0.3);
+        return Colors.grey.withValues(alpha:0.3);
       }),
     ),
   );
@@ -172,7 +172,6 @@ class MAppTheme {
       primary: primaryNavyBlue,
       secondary: trackingOrange,
       surface: darkGrey,
-      background: const Color(0xFF121212),
       onPrimary: backgroundWhite, // White text on navy blue
       onSecondary: primaryNavyBlue, // Navy text on orange
       onSurface: backgroundWhite, // Light text on dark surfaces
@@ -219,7 +218,7 @@ class MAppTheme {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: trackingOrange,
-        side: BorderSide(color: trackingOrange.withOpacity(0.8), width: 1.5),
+        side: BorderSide(color: trackingOrange.withValues(alpha:0.8), width: 1.5),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
@@ -251,7 +250,7 @@ class MAppTheme {
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: trackingOrange.withOpacity(0.3)),
+        borderSide: BorderSide(color: trackingOrange.withValues(alpha:0.3)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -303,9 +302,9 @@ class MAppTheme {
       }),
       trackColor: MaterialStateProperty.resolveWith((states) {
         if (states.contains(MaterialState.selected)) {
-          return trackingOrange.withOpacity(0.3);
+          return trackingOrange.withValues(alpha:0.3);
         }
-        return Colors.grey.withOpacity(0.3);
+        return Colors.grey.withValues(alpha:0.3);
       }),
     ),
   );

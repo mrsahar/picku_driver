@@ -21,7 +21,7 @@ class PulsingMarkerPainter extends CustomPainter {
 
     // Create pulsing circles
     final paint = Paint()
-      ..color = pulseColor.withOpacity(pulseOpacity * (1 - animationValue))
+      ..color = pulseColor.withValues(alpha:pulseOpacity * (1 - animationValue))
       ..style = PaintingStyle.fill;
 
     // Draw multiple pulse rings
@@ -29,7 +29,7 @@ class PulsingMarkerPainter extends CustomPainter {
       final radius = (size.width / 2) * animationValue * (1 + i * 0.3);
       final opacity = pulseOpacity * (1 - animationValue) * (1 - i * 0.2);
 
-      paint.color = pulseColor.withOpacity(opacity.clamp(0.0, 1.0));
+      paint.color = pulseColor.withValues(alpha:opacity.clamp(0.0, 1.0));
       canvas.drawCircle(center, radius, paint);
     }
   }

@@ -28,11 +28,11 @@ class WelcomeScreen extends StatelessWidget {
                 end: Alignment.bottomRight,
                 colors: isDarkMode
                     ? [
-                  MColor.primaryNavy.withOpacity(0.1),
+                  MColor.primaryNavy.withValues(alpha:0.1),
                   Colors.black,
                 ]
                     : [
-                  MColor.primaryNavy.withOpacity(0.05),
+                  MColor.primaryNavy.withValues(alpha:0.05),
                   Colors.white,
                 ],
               ),
@@ -61,7 +61,7 @@ class WelcomeScreen extends StatelessWidget {
                               height: width * 0.65,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: MColor.primaryNavy.withOpacity(0.08),
+                                color: MColor.primaryNavy.withValues(alpha:0.08),
                               ),
                             ),
                             Container(
@@ -69,7 +69,7 @@ class WelcomeScreen extends StatelessWidget {
                               height: width * 0.5,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: MColor.primaryNavy.withOpacity(0.12),
+                                color: MColor.primaryNavy.withValues(alpha:0.12),
                               ),
                             ),
                             Image(
@@ -127,7 +127,7 @@ class WelcomeScreen extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: MColor.primaryNavy.withOpacity(0.3),
+                              color: MColor.primaryNavy.withValues(alpha:0.3),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -169,7 +169,7 @@ class WelcomeScreen extends StatelessWidget {
                           },
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(
-                              color: MColor.primaryNavy.withOpacity(0.3),
+                              color: MColor.primaryNavy.withValues(alpha:0.3),
                               width: 1.5,
                             ),
                             shape: RoundedRectangleBorder(

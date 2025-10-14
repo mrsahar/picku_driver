@@ -164,7 +164,7 @@ class _BankAccountDetailsScreenState extends State<BankAccountDetailsScreen> {
               Text(
                 "Note: Please upload both sides of Driving License",
                 style: textTheme.bodySmall
-                    ?.copyWith(color: colorScheme.onSurface.withOpacity(0.7)),
+                    ?.copyWith(color: colorScheme.onSurface.withValues(alpha:0.7)),
               ),
               const SizedBox(height: 16),
 
@@ -266,7 +266,7 @@ class _BankAccountDetailsScreenState extends State<BankAccountDetailsScreen> {
             borderRadius: BorderRadius.circular(100),
             color: theme.brightness == Brightness.dark
                 ? theme.primaryColorDark // Lighter background for dark mode
-                : theme.primaryColor.withOpacity(0.1), // Regular background for light mode
+                : theme.primaryColor.withValues(alpha:0.1), // Regular background for light mode
           ),
           child: Icon(
             LineAwesomeIcons.sign_in_alt_solid,

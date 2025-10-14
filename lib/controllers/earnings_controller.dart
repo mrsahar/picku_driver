@@ -1,6 +1,5 @@
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:pick_u_driver/core/global_variables.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/models/earnings_model.dart';
 import 'package:pick_u_driver/providers/api_provider.dart';

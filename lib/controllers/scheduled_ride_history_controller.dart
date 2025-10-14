@@ -53,7 +53,7 @@ class ScheduledRideHistoryController extends GetxController {
         return;
       }
 
-      final endpoint = '/api/Ride/get-driver-scheduled-rides-history?userId=$userId';
+      final endpoint = '/api/Ride/get-driver-scheduled-rides-history?driverId=$userId';
       print(' SAHAr ScheduledRides API Request URL = ${_apiProvider.httpClient.baseUrl}$endpoint');
 
       // Use POST request as per your API

@@ -2,11 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:pick_u_driver/authentication/profile_screen.dart';
-import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/driver_screen/main_screen/home_screen.dart';
-import 'package:pick_u_driver/routes/app_routes.dart';
 import 'package:pick_u_driver/utils/modern_drawer.dart';
-import 'package:pick_u_driver/utils/profile_widget_menu.dart';
 import 'package:pick_u_driver/utils/theme/mcolors.dart';
 
 import '../core/permission_service.dart';
@@ -206,7 +203,7 @@ class _MainMapState extends State<MainMap> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.grey[800]?.withOpacity(0.5) : Colors.white.withOpacity(0.7),
+                      color: isDark ? Colors.grey[800]?.withValues(alpha:0.5) : Colors.white.withValues(alpha:0.7),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isDark ? Colors.grey[700]! : Colors.grey[200]!,
@@ -281,11 +278,11 @@ class _MainMapState extends State<MainMap> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.95),
+          color: Colors.white.withValues(alpha:0.95),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha:0.1),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),

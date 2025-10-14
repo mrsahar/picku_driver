@@ -19,7 +19,6 @@ class MapService extends GetxService {
   var routeDistance = ''.obs;
   var routeDuration = ''.obs;
   final List<LatLng> _interpolationPoints = [];
-  int _interpolationIndex = 0;
 
   GoogleMapController? mapController;
 
@@ -240,7 +239,7 @@ class MapService extends GetxService {
           destination: routePoints[i + 1],
         );
 
-        Color segmentColor = i == 0 ? MColor.primaryNavy : MColor.primaryNavy.withOpacity(0.7);
+        Color segmentColor = i == 0 ? MColor.primaryNavy : MColor.primaryNavy.withValues(alpha:0.7);
         List<PatternItem> patterns = i == 0 ? [] : [PatternItem.dash(10), PatternItem.gap(5)];
 
         polylines.add(Polyline(
@@ -659,7 +658,6 @@ class MapService extends GetxService {
     _pointsMarkerIcon = null;
     // ADD these lines:
     _interpolationPoints.clear();
-    _interpolationIndex = 0;
 
     _currentRoutePolyline.clear();
     _currentPolylineIndex = 0;

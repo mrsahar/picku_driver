@@ -40,7 +40,7 @@ class DriverDocumentsPage extends GetView<DriverDocumentsController> {
                   Container(
                     padding: EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: MColor.primaryNavy.withOpacity(0.1),
+                      color: MColor.primaryNavy.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -116,7 +116,7 @@ class DriverDocumentsPage extends GetView<DriverDocumentsController> {
                           : () => controller.uploadDocuments(),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: MColor.primaryNavy,
-                        disabledBackgroundColor: MColor.primaryNavy.withOpacity(0.5),
+                        disabledBackgroundColor: MColor.primaryNavy.withValues(alpha:0.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -213,13 +213,13 @@ class DriverDocumentsPage extends GetView<DriverDocumentsController> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: selectedImage != null
-              ? MColor.primaryNavy.withOpacity(0.3)
+              ? MColor.primaryNavy.withValues(alpha:0.3)
               : Colors.grey[300]!,
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 10,
             offset: Offset(0, 2),
           ),
@@ -236,7 +236,7 @@ class DriverDocumentsPage extends GetView<DriverDocumentsController> {
                 Container(
                   padding: EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: MColor.primaryNavy.withOpacity(0.1),
+                    color: MColor.primaryNavy.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(

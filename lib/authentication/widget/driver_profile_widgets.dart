@@ -105,8 +105,8 @@ class ProfileCompletionCard extends StatelessWidget {
                 height: 50,
                 decoration: BoxDecoration(
                   color: isComplete
-                      ? Colors.green.withOpacity(0.1)
-                      : Theme.of(context).primaryColor.withOpacity(0.1),
+                      ? Colors.green.withValues(alpha:0.1)
+                      : Theme.of(context).primaryColor.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(25),
                 ),
                 child: Icon(
@@ -132,13 +132,13 @@ class ProfileCompletionCard extends StatelessWidget {
                           ? 'Your driver profile is complete'
                           : 'Add your details to start driving',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                        color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha:0.7),
                       ),
                     ),
                     SizedBox(height: 8),
                     LinearProgressIndicator(
                       value: completionPercentage,
-                      backgroundColor: Colors.grey.withOpacity(0.3),
+                      backgroundColor: Colors.grey.withValues(alpha:0.3),
                       valueColor: AlwaysStoppedAnimation<Color>(
                         isComplete ? Colors.green : Theme.of(context).primaryColor,
                       ),

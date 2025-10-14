@@ -9,7 +9,6 @@ import 'package:pick_u_driver/controllers/driver_status_controller.dart';
 import 'package:pick_u_driver/core/location_service.dart';
 import 'package:pick_u_driver/core/map_service.dart';
 import 'package:pick_u_driver/core/permission_service.dart';
-import 'package:pick_u_driver/driver_screen/main_screen/ride_widgets/status_badge.dart';
 import 'package:pick_u_driver/utils/map_theme/dark_map_theme.dart';
 import 'package:pick_u_driver/utils/map_theme/light_map_theme.dart';
 
@@ -111,20 +110,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     // Show button if moved away from location OR zoomed out/in significantly
-    // Distance > 0.0005 is roughly ~50 meters
-    // Or if zoom level is not between 15 and 17.5
     bool movedAway = distance > 0.0005;
     bool zoomedAway = position.zoom < 15.0 || position.zoom > 17.5;
 
     if (movedAway || zoomedAway) {
       if (!_showCenterButton.value) {
         _showCenterButton.value = true;
-        print('🎯 SAHAr Showing center button - Distance: $distance, Zoom: ${position.zoom}');
       }
     } else {
       if (_showCenterButton.value) {
         _showCenterButton.value = false;
-        print('🎯 SAHAr Hiding center button');
       }
     }
   }
@@ -133,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
     double dLat = (lat2 - lat1).abs();
     double dLon = (lon2 - lon1).abs();
-    return dLat + dLon; // Simple approximation
+    return dLat + dLon;
   }
 
   /// Center map to user location with zoom animation
@@ -163,7 +158,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
 
-      // Hide the button
       _showCenterButton.value = false;
     } catch (e) {
       print('❌ SAHAr Error centering to location: $e');
@@ -196,11 +190,11 @@ class _HomeScreenState extends State<HomeScreen> {
             myLocationEnabled: false,
             zoomControlsEnabled: false,
             markers: {
-              ..._mapService.markers.toSet(), // Reactive markers from map service (includes pulsing animation)
-              ..._backgroundService.rideMarkers, // Ride markers from background service
+              ..._mapService.markers.toSet(),
+              ..._backgroundService.rideMarkers,
             },
             polylines: {
-              ..._backgroundService.routePolylines, // Route polylines from background service
+              ..._backgroundService.routePolylines,
             },
             onMapCreated: (GoogleMapController controller) {
               _mapService.setMapController(controller);
@@ -209,84 +203,39 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // Center to Marker Button (Shows when user moves away)
+        // Center to Marker Button
         Obx(() => _showCenterButton.value
             ? Positioned(
-                bottom: 100,
-                right: 16,
-                child: Material(
-                  elevation: 8,
+          bottom: 100,
+          right: 16,
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              onTap: _centerToUserLocation,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
-                    onTap: _centerToUserLocation,
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: const Color(0xFF1A2A44),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.my_location,
-                            color: const Color(0xFF1A2A44),
-                            size: 24,
-                          ),
-                        ],
-                      ),
-                    ),
+                  border: Border.all(
+                    color: const Color(0xFF1A2A44),
+                    width: 1,
                   ),
                 ),
-              )
+                child: const Icon(
+                  Icons.my_location,
+                  color: Color(0xFF1A2A44),
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
+        )
             : const SizedBox.shrink()),
 
-        // Ride Status Badge (Center Top)
-        Positioned(
-          top: 100,
-          left: 0,
-          right: 0,
-          child: Obx(() {
-            final ride = _backgroundService.currentRide.value;
-            if (ride == null) return const SizedBox.shrink();
-
-            Color statusColor;
-            IconData statusIcon;
-
-            switch (ride.status) {
-              case 'Waiting':
-                statusColor = Colors.orange;
-                statusIcon = Icons.schedule;
-                break;
-              case 'In-Progress':
-                statusColor = Colors.blue;
-                statusIcon = Icons.directions_car;
-                break;
-              case 'Completed':
-                statusColor = Colors.green;
-                statusIcon = Icons.check_circle;
-                break;
-              default:
-                statusColor = Colors.grey;
-                statusIcon = Icons.info;
-            }
-
-            return Center(
-              child: RippleStatusBadge(
-                status: ride.status,
-                statusColor: statusColor,
-                statusIcon: statusIcon,
-              ),
-            );
-          }),
-        ),
-
-        // Enhanced Driver Status Toggle Button (Top Right)
+        // Driver Status Toggle Button (Top Right)
         Positioned(
           top: 40,
           right: 0,

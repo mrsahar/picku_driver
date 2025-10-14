@@ -31,7 +31,7 @@ class ProfileForm extends StatelessWidget {
               Text(
                 'Don’t worry, only you can see your personal data. No one else will be able to see it.',
                 style: textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onBackground.withOpacity(0.7),
+                  color: colorScheme.onBackground.withValues(alpha:0.7),
                 ),
                 textAlign: TextAlign.center,
               ),

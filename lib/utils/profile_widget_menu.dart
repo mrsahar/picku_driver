@@ -29,7 +29,7 @@ class ProfileMenuWidget extends StatelessWidget {
      // color: bgColor, // Set background color for ripple effect
       child: InkWell(
         onTap: onPress,
-        splashColor: iconColor.withOpacity(0.2), // Customize ripple color
+        splashColor: iconColor.withValues(alpha:0.2), // Customize ripple color
         borderRadius: BorderRadius.circular(8), // Optional: Rounded ripple
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 5.0),
@@ -39,7 +39,7 @@ class ProfileMenuWidget extends StatelessWidget {
               height: 40,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(100),
-                color: textColor?.withOpacity(0.1) ?? iconColor.withOpacity(0.1),
+                color: textColor?.withValues(alpha:0.1) ?? iconColor.withValues(alpha:0.1),
               ),
               child: Icon(icon, color: textColor ?? iconColor),
             ),
@@ -56,7 +56,7 @@ class ProfileMenuWidget extends StatelessWidget {
               height: 30,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(100),
-                color: Colors.grey.withOpacity(0.1),
+                color: Colors.grey.withValues(alpha:0.1),
               ),
               child: const Icon(
                 Icons.chevron_right,

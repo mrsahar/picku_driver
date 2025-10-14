@@ -100,14 +100,14 @@ class VerifyMessageScreen extends StatelessWidget {
             end: Alignment.bottomCenter,
             colors: isDarkMode
                 ? [
-              MColor.primaryNavy.withOpacity(0.95),
+              MColor.primaryNavy.withValues(alpha:0.95),
               MColor.primaryNavy,
               Colors.black,
             ]
                 : [
-              MColor.primaryNavy.withOpacity(0.85),
+              MColor.primaryNavy.withValues(alpha:0.85),
               MColor.primaryNavy,
-              MColor.primaryNavy.withOpacity(0.95),
+              MColor.primaryNavy.withValues(alpha:0.95),
             ],
           ),
         ),
@@ -136,7 +136,7 @@ class VerifyMessageScreen extends StatelessWidget {
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.white.withOpacity(0.3),
+                        color: Colors.white.withValues(alpha:0.3),
                         blurRadius: 30,
                         spreadRadius: 10,
                       ),
@@ -171,7 +171,7 @@ class VerifyMessageScreen extends StatelessWidget {
                         _getSubtitle(),
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha:0.9),
                           fontSize: 16,
                           height: 1.5,
                         ),
@@ -204,7 +204,7 @@ class VerifyMessageScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.white.withOpacity(0.25),
+                color: Colors.white.withValues(alpha:0.25),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -253,7 +253,7 @@ class VerifyMessageScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.white.withOpacity(0.25),
+                    color: Colors.white.withValues(alpha:0.25),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -299,11 +299,11 @@ class VerifyMessageScreen extends StatelessWidget {
               child: Text(
                 "Contact Support",
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha:0.9),
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                   decoration: TextDecoration.underline,
-                  decorationColor: Colors.white.withOpacity(0.9),
+                  decorationColor: Colors.white.withValues(alpha:0.9),
                 ),
               ),
             ),
@@ -319,7 +319,7 @@ class VerifyMessageScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha:0.5),
                   width: 2,
                 ),
               ),
@@ -348,7 +348,7 @@ class VerifyMessageScreen extends StatelessWidget {
             Text(
               "We'll notify you via email",
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha:0.7),
                 fontSize: 14,
               ),
             ),

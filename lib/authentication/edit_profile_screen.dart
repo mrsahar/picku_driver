@@ -135,7 +135,7 @@ class EditProfileScreen extends StatelessWidget {
                               ? null
                               : () => controller.deleteAccount(),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.redAccent.withOpacity(0.1),
+                            backgroundColor: Colors.redAccent.withValues(alpha:0.1),
                             elevation: 0,
                             foregroundColor: Colors.red,
                             shape: const StadiumBorder(),

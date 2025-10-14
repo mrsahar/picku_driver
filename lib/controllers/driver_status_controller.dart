@@ -233,11 +233,11 @@ class DriverStatusToggle extends StatelessWidget {
           margin: const EdgeInsets.only(right: 16),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.95),
+            color: Colors.white.withValues(alpha:0.95),
             borderRadius: BorderRadius.circular(25),
             boxShadow: [
               BoxShadow(
-                color: statusColor.withOpacity(0.3),
+                color: statusColor.withValues(alpha:0.3),
                 blurRadius: 12,
                 spreadRadius: 2,
                 offset: const Offset(0, 4),
@@ -296,7 +296,7 @@ class DriverStatusToggle extends StatelessWidget {
                     Text(
                       subText,
                       style: TextStyle(
-                        color: statusColor.withOpacity(0.7),
+                        color: statusColor.withValues(alpha:0.7),
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
                       ),
@@ -340,7 +340,7 @@ class DriverStatusToggle extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.6 * value),
+                color: color.withValues(alpha:0.6 * value),
                 blurRadius: 8 * value,
                 spreadRadius: 4 * value,
               ),
@@ -391,7 +391,7 @@ class DriverStatusToggle extends StatelessWidget {
               ),
 
               const SizedBox(height: 20),
-              Divider(color: MColor.primaryNavy.withOpacity(0.3), height: 20),
+              Divider(color: MColor.primaryNavy.withValues(alpha:0.3), height: 20),
 
               // Core service info
               _buildDetailRow(

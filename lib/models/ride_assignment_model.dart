@@ -74,7 +74,6 @@ class RideAssignment {
   // Helper method to get the display fare
   double get displayFare => fareEstimate ?? fareFinal;
 }
-
 class RideStop {
   final int stopOrder;
   final String location;
@@ -92,8 +91,17 @@ class RideStop {
     return RideStop(
       stopOrder: json['stopOrder'] ?? 0,
       location: json['location'] ?? '',
-      latitude: (json['latitude'] ?? 0).toDouble(),
-      longitude: (json['longitude'] ?? 0).toDouble(),
+      latitude: (json['latitude'] ?? 0.0).toDouble(),
+      longitude: (json['longitude'] ?? 0.0).toDouble(),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'stopOrder': stopOrder,
+      'location': location,
+      'latitude': latitude,
+      'longitude': longitude,
+    };
   }
 }

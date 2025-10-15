@@ -26,13 +26,13 @@ class RideWidget extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: MColor.primaryNavy.withOpacity(0.06),
+            color: MColor.primaryNavy.withValues(alpha:0.06),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
         ],
         border: Border.all(
-          color: MColor.primaryNavy.withOpacity(0.08),
+          color: MColor.primaryNavy.withValues(alpha:0.08),
           width: 1,
         ),
       ),
@@ -64,7 +64,7 @@ class RideWidget extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 22,
-                backgroundColor: MColor.primaryNavy.withOpacity(0.1),
+                backgroundColor: MColor.primaryNavy.withValues(alpha:0.1),
                 child: Text(
                   ride.passengerName.isNotEmpty
                       ? ride.passengerName[0].toUpperCase()
@@ -94,7 +94,7 @@ class RideWidget extends StatelessWidget {
                     Text(
                       "${ride.passengerCount} Passenger${ride.passengerCount > 1 ? 's' : ''}",
                       style: TextStyle(
-                        color: MColor.primaryNavy.withOpacity(0.6),
+                        color: MColor.primaryNavy.withValues(alpha:0.6),
                         fontSize: 12.5,
                       ),
                     ),
@@ -140,17 +140,17 @@ class RideWidget extends StatelessWidget {
               padding:
               const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               decoration: BoxDecoration(
-                color: MColor.primaryNavy.withOpacity(0.05),
+                color: MColor.primaryNavy.withValues(alpha:0.05),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: MColor.primaryNavy.withOpacity(0.1),
+                  color: MColor.primaryNavy.withValues(alpha:0.1),
                   width: 1,
                 ),
               ),
               child: Row(
                 children: [
                   Icon(Icons.timer_outlined,
-                      color: MColor.primaryNavy.withOpacity(0.8), size: 18),
+                      color: MColor.primaryNavy.withValues(alpha:0.8), size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -166,7 +166,7 @@ class RideWidget extends StatelessWidget {
                     Text(
                       "Total: ${rideController.totalWaitingTimeFormatted}",
                       style: TextStyle(
-                        color: MColor.primaryNavy.withOpacity(0.7),
+                        color: MColor.primaryNavy.withValues(alpha:0.7),
                         fontSize: 13,
                       ),
                     ),
@@ -190,14 +190,14 @@ class RideWidget extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 gradient: LinearGradient(
                   colors: [
-                    MColor.primaryNavy.withOpacity(0.05),
-                    MColor.primaryNavy.withOpacity(0.03)
+                    MColor.primaryNavy.withValues(alpha:0.05),
+                    MColor.primaryNavy.withValues(alpha:0.03)
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 border: Border.all(
-                  color: MColor.primaryNavy.withOpacity(0.08),
+                  color: MColor.primaryNavy.withValues(alpha:0.08),
                   width: 1,
                 ),
               ),
@@ -205,7 +205,7 @@ class RideWidget extends StatelessWidget {
                 children: [
                   Icon(
                       Icons.payments_rounded,
-                      color: MColor.primaryNavy.withOpacity(0.8),
+                      color: MColor.primaryNavy.withValues(alpha:0.8),
                       size: 18
                   ),
                   const SizedBox(width: 6),
@@ -289,7 +289,7 @@ class RideWidget extends StatelessWidget {
       case 'Waiting':
         icon = Icons.schedule_rounded;
         label = 'Waiting';
-        color = MColor.primaryNavy.withOpacity(0.8);
+        color = MColor.primaryNavy.withValues(alpha:0.8);
         break;
       case 'In-Progress':
         icon = Icons.directions_car_rounded;
@@ -304,15 +304,15 @@ class RideWidget extends StatelessWidget {
       default:
         icon = Icons.info_outline_rounded;
         label = status;
-        color = MColor.primaryNavy.withOpacity(0.6);
+        color = MColor.primaryNavy.withValues(alpha:0.6);
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha:0.1),
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha:0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -337,7 +337,7 @@ class RideWidget extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(
           top: BorderSide(
-            color: MColor.primaryNavy.withOpacity(0.2),
+            color: MColor.primaryNavy.withValues(alpha:0.2),
             width: 1,
             style: BorderStyle.solid,
           ),
@@ -347,7 +347,7 @@ class RideWidget extends StatelessWidget {
   }
 
   Widget _buildSectionDivider() => Divider(
-    color: MColor.primaryNavy.withOpacity(0.15),
+    color: MColor.primaryNavy.withValues(alpha:0.15),
     thickness: 1,
     height: 1,
   );
@@ -360,7 +360,7 @@ class RideWidget extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: MColor.primaryNavy.withOpacity(0.8), size: 18),
+        Icon(icon, color: MColor.primaryNavy.withValues(alpha:0.8), size: 18),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
@@ -368,7 +368,7 @@ class RideWidget extends StatelessWidget {
             children: [
               Text(title,
                   style: TextStyle(
-                    color: MColor.primaryNavy.withOpacity(0.6),
+                    color: MColor.primaryNavy.withValues(alpha:0.6),
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   )),
@@ -400,7 +400,7 @@ class RideWidget extends StatelessWidget {
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: MColor.primaryNavy.withOpacity(0.08),
+          color: MColor.primaryNavy.withValues(alpha:0.08),
         ),
         child: Icon(icon, color: MColor.primaryNavy, size: 18),
       ),
@@ -441,7 +441,7 @@ class RideWidget extends StatelessWidget {
       Get.snackbar(
         "Call Passenger",
         "Phone number not available",
-        backgroundColor: MColor.primaryNavy.withOpacity(0.08),
+        backgroundColor: MColor.primaryNavy.withValues(alpha:0.08),
         colorText: MColor.primaryNavy,
         icon: Icon(Icons.phone_outlined, color: MColor.primaryNavy),
         duration: const Duration(seconds: 2),

@@ -18,6 +18,7 @@ class InitialBinding extends Bindings {
     Get.put(LocationService(), permanent: true);
     Get.put(MapService(), permanent: true);
     Get.put(BackgroundTrackingService(), permanent: true);
+    // ActiveRideController removed - will be initialized after connection check
     // remove this line if not using SignalR
     Get.put(SignalRService(), permanent: true);
   }

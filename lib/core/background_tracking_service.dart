@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:pick_u_driver/controllers/active_ride_controller.dart';
 import 'package:pick_u_driver/core/google_directions_service.dart';
 import 'package:pick_u_driver/core/location_service.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/driver_screen/widget/modern_payment_dialog.dart';
-import 'package:pick_u_driver/models/ride_assignment_model.dart';
+import 'package:pick_u_driver/models/ride_assignment_model.dart'; 
 import 'package:pick_u_driver/routes/app_routes.dart';
 import 'package:signalr_core/signalr_core.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
@@ -147,6 +148,121 @@ class BackgroundTrackingService extends GetxService {
     }
   }
 
+  /// Resume an active ride with the provided ride data
+  void resumeActiveRide(RideAssignment activeRide) {
+    try {
+      print('🔄 SAHAr Resuming active ride: ${activeRide.rideId}');
+
+      // Set current ride information
+      currentRideId.value = activeRide.rideId;
+      rideStatus.value = 'Resuming ${activeRide.status}';
+
+      // Create RideAssignment from DriverLastRideModel
+      final rideAssignment = RideAssignment(
+        rideId: activeRide.rideId,
+        rideType: activeRide.rideType,
+        fareEstimate: activeRide.fareEstimate,
+        fareFinal: activeRide.fareFinal,
+        createdAt: activeRide.createdAt,
+        status: activeRide.status,
+        passengerId: activeRide.passengerId,
+        passengerName: activeRide.passengerName,
+        passengerPhone: activeRide.passengerPhone,
+        pickupLocation: activeRide.pickupLocation,
+        pickUpLat: activeRide.pickUpLat,
+        pickUpLon: activeRide.pickUpLon,
+        dropoffLocation: activeRide.dropoffLocation,
+        dropoffLat: activeRide.dropoffLat,
+        dropoffLon: activeRide.dropoffLon,
+        stops: activeRide.stops.map((rs) => RideStop(
+          stopOrder: rs.stopOrder,
+          location: rs.location,
+          latitude: rs.latitude,
+          longitude: rs.longitude,  
+        )).toList(),
+        passengerCount: activeRide.passengerCount,
+      );
+
+      currentRide.value = rideAssignment;
+
+      // Update markers and route
+      _updateMarkersForActiveRide(activeRide);
+
+      // Start location tracking if not already running
+      if (!isRunning.value) {
+        startTracking();
+      }
+
+      // Connect to SignalR if not connected
+      if (!isConnected.value) {
+        connectToHub();
+      }
+
+      print('✅ SAHAr Active ride resumed successfully');
+    } catch (e) {
+      print('❌ SAHAr Error resuming active ride: $e');
+    }
+  }
+
+  /// Update markers for the active ride
+  void _updateMarkersForActiveRide(RideAssignment activeRide) {
+    try {
+      Set<Marker> markers = {};
+
+      // Add pickup marker if available
+      if (activeRide.stops.isNotEmpty) {
+        final pickup = activeRide.stops.first;
+        markers.add(
+          Marker(
+            markerId: const MarkerId('pickup'),
+            position: LatLng(pickup.latitude, pickup.longitude),
+            icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+            infoWindow: InfoWindow(
+              title: 'Pickup Location',
+              snippet: pickup.location,
+            ),
+          ),
+        );
+      }
+
+      // Add destination marker if available
+      if (activeRide.stops.length > 1) {
+        final destination = activeRide.stops.last;
+        markers.add(
+          Marker(
+            markerId: const MarkerId('destination'),
+            position: LatLng(destination.latitude, destination.longitude),
+            icon: _destinationIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+            infoWindow: InfoWindow(
+              title: 'Destination',
+              snippet: destination.location,
+            ),
+          ),
+        );
+      }
+
+      // Add intermediate stops if any
+      for (int i = 1; i < activeRide.stops.length - 1; i++) {
+        final stop = activeRide.stops[i];
+        markers.add(
+          Marker(
+            markerId: MarkerId('stop_$i'),
+            position: LatLng(stop.latitude, stop.longitude),
+            icon: _stopIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
+            infoWindow: InfoWindow(
+              title: 'Stop $i',
+              snippet: stop.location,
+            ),
+          ),
+        );
+      }
+
+      rideMarkers.value = markers;
+      print('✅ SAHAr Updated markers for active ride: ${markers.length} markers');
+    } catch (e) {
+      print('❌ SAHAr Error updating markers for active ride: $e');
+    }
+  }
 
   void showPaymentSuccessPopup({required double fareFinal, required double tip}) {
     final bool hasTip = tip > 0;
@@ -171,7 +287,7 @@ class BackgroundTrackingService extends GetxService {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Colors.green.withValues(alpha:0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -198,7 +314,7 @@ class BackgroundTrackingService extends GetxService {
                   'Payment has been successfully completed',
                   style: TextStyle(
                     fontSize: 14,
-                    color: MColor.primaryNavy.withOpacity(0.6),
+                    color: MColor.primaryNavy.withValues(alpha:0.6),
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -208,10 +324,10 @@ class BackgroundTrackingService extends GetxService {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: MColor.primaryNavy.withOpacity(0.04),
+                    color: MColor.primaryNavy.withValues(alpha:0.04),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: MColor.primaryNavy.withOpacity(0.1),
+                      color: MColor.primaryNavy.withValues(alpha:0.1),
                     ),
                   ),
                   child: Column(
@@ -224,7 +340,7 @@ class BackgroundTrackingService extends GetxService {
                             'Ride Fare',
                             style: TextStyle(
                               fontSize: 14,
-                              color: MColor.primaryNavy.withOpacity(0.7),
+                              color: MColor.primaryNavy.withValues(alpha:0.7),
                             ),
                           ),
                           Text(
@@ -256,7 +372,7 @@ class BackgroundTrackingService extends GetxService {
                                   'Tip',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: MColor.primaryNavy.withOpacity(0.7),
+                                    color: MColor.primaryNavy.withValues(alpha:0.7),
                                   ),
                                 ),
                               ],
@@ -273,7 +389,7 @@ class BackgroundTrackingService extends GetxService {
                         ),
                         const SizedBox(height: 12),
                         Divider(
-                          color: MColor.primaryNavy.withOpacity(0.1),
+                          color: MColor.primaryNavy.withValues(alpha:0.1),
                           height: 1,
                         ),
                         const SizedBox(height: 12),
@@ -317,14 +433,14 @@ class BackgroundTrackingService extends GetxService {
                           _resetRide(); // Clear everything
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: MColor.primaryNavy.withOpacity(0.1),
+                          backgroundColor: MColor.primaryNavy.withValues(alpha:0.1),
                           foregroundColor: MColor.primaryNavy,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                             side: BorderSide(
-                              color: MColor.primaryNavy.withOpacity(0.2),
+                              color: MColor.primaryNavy.withValues(alpha:0.2),
                               width: 1,
                             ),
                           ),
@@ -403,6 +519,9 @@ class BackgroundTrackingService extends GetxService {
       connectionStatus.value = 'Connected';
       _stopReconnectionTimer();
       _resumeLocationUpdates();
+
+      // Initialize ActiveRideController after successful reconnection
+      _initializeActiveRideController();
 
       // Re-subscribe to ride assignments
       if (_driverId != null) {
@@ -568,6 +687,22 @@ class BackgroundTrackingService extends GetxService {
   }
 
 
+  /// Initialize ActiveRideController after successful connection
+  void _initializeActiveRideController() {
+    try {
+      // Check if ActiveRideController is already registered
+      if (!Get.isRegistered<ActiveRideController>()) {
+        print('🎯 SAHAr Initializing ActiveRideController after connection');
+        Get.put(ActiveRideController(), permanent: true);
+        print('✅ SAHAr ActiveRideController initialized successfully');
+      } else {
+        print('ℹ️ SAHAr ActiveRideController already registered');
+      }
+    } catch (e) {
+      print('❌ SAHAr Error initializing ActiveRideController: $e');
+    }
+  }
+
   /// Start reconnection timer
   void _startReconnectionTimer() {
     _stopReconnectionTimer();
@@ -616,6 +751,10 @@ class BackgroundTrackingService extends GetxService {
       isConnected.value = true;
       connectionStatus.value = 'Connected';
       print('✅ SAHAr Connected to hub');
+
+      // Initialize ActiveRideController after successful connection
+      _initializeActiveRideController();
+
       return true;
     } catch (e) {
       print('❌ SAHAr Connection failed: $e');
@@ -1003,6 +1142,16 @@ class BackgroundTrackingService extends GetxService {
     isWaitingForPayment.value = false;
     paymentCompleted.value = false;
     showPaymentDialog.value = false;
+  }
+
+  /// Public method to start tracking (called by ActiveRideController)
+  Future<void> startTracking() async {
+    await startBackgroundService();
+  }
+
+  /// Public method to connect to hub (called by ActiveRideController)
+  Future<void> connectToHub() async {
+    await _connect();
   }
 
   /// Manual reconnect (public method for UI)

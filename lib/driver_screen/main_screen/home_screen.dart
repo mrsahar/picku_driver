@@ -11,8 +11,8 @@ import 'package:pick_u_driver/core/map_service.dart';
 import 'package:pick_u_driver/core/permission_service.dart';
 import 'package:pick_u_driver/utils/map_theme/dark_map_theme.dart';
 import 'package:pick_u_driver/utils/map_theme/light_map_theme.dart';
-
 import 'ride_widgets/ride_widget.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -41,6 +41,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final RxBool _showCenterButton = false.obs;
   LatLng? _userLocation;
 
+  // Track if initial location has been set
+  bool _hasInitialLocationBeenSet = false;
+
   @override
   void initState() {
     super.initState();
@@ -53,6 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_permissionService.isReady) {
         await _initializeControllers();
         await _showCurrentLocationOnMap();
+        _setupLocationListener(); // Add location listener
       }
     } catch (e) {
       print('❌ SAHAr Error initializing app: $e');
@@ -85,16 +89,69 @@ class _HomeScreenState extends State<HomeScreen> {
           title: 'My Location',
         );
 
-        // Start pulsing animation for user marker
-        _mapService.startPulsingUserMarker();
+        // Center map on first location
+        if (!_hasInitialLocationBeenSet) {
+          await _centerMapToLocation(currentLocation, zoom: 17.0);
+          _hasInitialLocationBeenSet = true;
+          print('✅ SAHAr First location set and map centered');
+        }
 
-        setState(() {
-          // markers = _mapService.markers.toSet();
-        });
+        setState(() {});
       }
     } catch (e) {
       print('❌ SAHAr Error showing current location: $e');
     }
+  }
+
+  /// Setup location listener for continuous updates
+  void _setupLocationListener() {
+    // Listen to location changes
+    ever(_locationService.currentLatLng, (LatLng? newLocation) {
+      if (newLocation != null) {
+        print('📍 SAHAr Location updated: $newLocation');
+
+        // Update user location marker with smooth animation
+        _mapService.updateUserLocationMarker(
+          newLocation.latitude,
+          newLocation.longitude,
+          title: 'My Location',
+          centerMap: false, // Don't auto-center after first time
+        );
+
+        // Update stored location
+        _userLocation = newLocation;
+
+        // Center map only on first location update
+        if (!_hasInitialLocationBeenSet) {
+          _centerMapToLocation(newLocation, zoom: 17.0);
+          _hasInitialLocationBeenSet = true;
+          print('✅ SAHAr First location set via listener');
+        }
+      }
+    });
+
+    // Check if location is already available (in case listener misses initial update)
+    if (_locationService.currentLatLng.value != null && !_hasInitialLocationBeenSet) {
+      LatLng currentLocation = _locationService.currentLatLng.value!;
+      print('📍 SAHAr Location already available: $currentLocation');
+
+      _mapService.updateUserLocationMarker(
+        currentLocation.latitude,
+        currentLocation.longitude,
+        title: 'My Location',
+      );
+
+      _userLocation = currentLocation;
+      _centerMapToLocation(currentLocation, zoom: 17.0);
+      _hasInitialLocationBeenSet = true;
+      print('✅ SAHAr Initial location already available and set');
+    }
+  }
+
+  /// Center map to specific location
+  Future<void> _centerMapToLocation(LatLng location, {double zoom = 16.0}) async {
+    await _mapService.animateToLocation(location, zoom: zoom);
+    print('🎯 SAHAr Map centered to: $location with zoom: $zoom');
   }
 
   /// Check if camera moved away from user location
@@ -182,25 +239,29 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         // Google Map
         Obx(
-              () => GoogleMap(
-            mapType: MapType.normal,
-            style: (isDarkMode) ? darkMapTheme : lightMapTheme,
-            initialCameraPosition: _kGooglePlex,
-            myLocationButtonEnabled: true,
-            myLocationEnabled: false,
-            zoomControlsEnabled: false,
-            markers: {
-              ..._mapService.markers.toSet(),
-              ..._backgroundService.rideMarkers,
-            },
-            polylines: {
-              ..._backgroundService.routePolylines,
-            },
-            onMapCreated: (GoogleMapController controller) {
-              _mapService.setMapController(controller);
-            },
-            onCameraMove: _onCameraMove,
-          ),
+              () {
+            print('🗺️ SAHAr Rebuilding map with ${_mapService.markers.length} markers');
+            return GoogleMap(
+              mapType: MapType.normal,
+              style: (isDarkMode) ? darkMapTheme : lightMapTheme,
+              initialCameraPosition: _kGooglePlex,
+              myLocationButtonEnabled: false,
+              myLocationEnabled: false,
+              zoomControlsEnabled: false,
+              markers: {
+                ..._mapService.markers.toSet(),
+                ..._backgroundService.rideMarkers,
+              },
+              polylines: {
+                ..._backgroundService.routePolylines,
+              },
+              onMapCreated: (GoogleMapController controller) {
+                _mapService.setMapController(controller);
+                print('✅ SAHAr Map controller set');
+              },
+              onCameraMove: _onCameraMove,
+            );
+          },
         ),
 
         // Center to Marker Button
@@ -240,6 +301,48 @@ class _HomeScreenState extends State<HomeScreen> {
           top: 40,
           right: 0,
           child: DriverStatusToggle(),
+        ),
+
+        // Loading indicator for location
+        Positioned(
+          top: 100,
+          left: 0,
+          right: 0,
+          child: Obx(() {
+            if (_locationService.isLocationLoading.value &&
+                _locationService.currentAddress.value.isEmpty) {
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Getting your location...',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          }),
         ),
 
         // Ride Details Bottom Sheet

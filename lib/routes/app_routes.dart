@@ -28,6 +28,7 @@ abstract class AppRoutes {
   static const settingsScreen = '/settingsScreen';
   static const helpCenterScreen = '/helpCenter';
   static const String privacyPolicy = '/privacyPolicy';
+  static const driveAdminChat = '/driver-admin-chat';
 
   //verification pages of driver documents
   static const DRIVER_DOCUMENTS = '/driver-documents';

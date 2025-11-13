@@ -87,9 +87,11 @@ Widget buildModernDrawer(BuildContext context, bool isDark) {
               ),
               _ModernMenuTile(
                 icon: LineAwesomeIcons.comment_solid,
-                title: 'Feedback',
+                title: 'Support Team',
                 isDark: isDark,
-                onTap: () {},
+                onTap: () {
+                  Get.toNamed(AppRoutes.driveAdminChat);
+                },
               ),
             ],
           ),

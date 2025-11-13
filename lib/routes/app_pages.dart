@@ -20,6 +20,8 @@ import 'package:pick_u_driver/driver_screen/screens/verify_message_screen.dart';
 import 'package:pick_u_driver/routes/app_route_observer.dart';
 import 'package:pick_u_driver/driver_screen/main_map.dart';
 import 'package:pick_u_driver/driver_screen/shift_time.dart';
+import '../bindings/driver_admin_chat_binding.dart';
+import '../driver_screen/driver_admin_chat_screen.dart';
 import '../driver_screen/screens/welcome_screen.dart';
 import 'app_routes.dart';
 import 'package:pick_u_driver/authentication/edit_profile_screen.dart'; 
@@ -73,6 +75,11 @@ class AppPages {
       binding: LoginBinding(), // Add login binding
     ),
     GetPage(
+      name: AppRoutes.profileScreen,
+      page: () => const ProfileScreen(),
+      binding: ProfileBinding(), // Add login binding
+    ),
+    GetPage(
       name: AppRoutes.MainMap,
       page: () => const MainMap(), // Make sure you have this screen
       // Add reset password binding if needed
@@ -116,6 +123,11 @@ class AppPages {
       name: AppRoutes.scheduledRideHistory,
       page: () => const ScheduledRideHistoryPage(),
       binding: ScheduledRideHistoryBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.driveAdminChat,
+      page: () => DriverAdminChatScreen(),
+      binding: DriverAdminChatBinding(),
     ),
 
     // Extra

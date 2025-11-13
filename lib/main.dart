@@ -41,8 +41,8 @@ class _MyAppState extends State<MyApp> {
       themeMode: ThemeMode.system,
       initialBinding: InitialBinding(),
       navigatorObservers: [AppPages.routeObserver],
-      initialRoute: AppPages.INITIAL, // Keep this
-      getPages: AppPages.routes,      // Keep this
+      initialRoute: AppPages.INITIAL,
+      getPages: AppPages.routes,
     );
   }
 }

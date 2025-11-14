@@ -20,6 +20,8 @@ class DriverProfileController extends GetxController {
   final carRegistrationController = TextEditingController();
   final carInsuranceController = TextEditingController();
   final sinController = TextEditingController();
+  final vehicleNameController = TextEditingController();
+  final vehicleColorController = TextEditingController();
 
   // Observable variables
   var driverProfile = Rx<DriverProfileModel?>(null);
@@ -38,10 +40,7 @@ class DriverProfileController extends GetxController {
     try {
       final driverId = await SharedPrefsService.getUserId();
       if (driverId != null && driverId.isNotEmpty) {
-        // Create empty profile with driver ID
         driverProfile.value = DriverProfileModel.empty(driverId);
-
-        // Try to fetch existing profile data
         await fetchDriverProfile();
       } else {
         _showErrorSnackbar('Driver ID not found. Please login again.');
@@ -64,7 +63,6 @@ class DriverProfileController extends GetxController {
         return;
       }
 
-      // Make API call to get existing profile (adjust endpoint as needed)
       final response = await _apiProvider.getData('/api/Drivers/profile/$driverId');
 
       print(' SAHAr 🔍 Profile Response Status: ${response.statusCode}');
@@ -85,7 +83,6 @@ class DriverProfileController extends GetxController {
       }
     } catch (e) {
       print(' SAHAr 💥 Exception while fetching profile: $e');
-      // Don't show error for fetching, as profile might not exist yet
     } finally {
       isFetchingProfile.value = false;
     }
@@ -104,6 +101,8 @@ class DriverProfileController extends GetxController {
       carRegistrationController.text = profile.carRegistration;
       carInsuranceController.text = profile.carInsurance;
       sinController.text = profile.sin;
+      vehicleNameController.text = profile.vehicleName;
+      vehicleColorController.text = profile.vehicleColor;
     }
   }
 
@@ -127,7 +126,7 @@ class DriverProfileController extends GetxController {
       // Prepare request data - ALL VALUES AS STRINGS
       final requestData = <String, String>{
         'id': driverId,
-        'name': nameController.text.trim(),                    // Added name field
+        'name': nameController.text.trim(),
         'phoneNumber': phoneController.text.trim(),
         'address': addressController.text.trim(),
         'licenseNumber': licenseController.text.trim(),
@@ -136,15 +135,13 @@ class DriverProfileController extends GetxController {
         'carRegistration': carRegistrationController.text.trim(),
         'carInsurance': carInsuranceController.text.trim(),
         'sin': sinController.text.trim(),
+        'vehicleName': vehicleNameController.text.trim(),
+        'vehicleColor': vehicleColorController.text.trim(),
+        // stripeAccountId is NOT included - it's managed by backend
       };
 
-      print(' SAHAr 📤 Request data (Map<String, String>): $requestData');
+      print(' SAHAr 📤 Request data: $requestData');
 
-      // Convert to JSON string for verification
-      final jsonString = json.encode(requestData);
-      print(' SAHAr 📤 JSON string: $jsonString');
-
-      // Make API call to update profile
       final response = await _apiProvider.postData('/api/Drivers/update-profile', requestData);
 
       print(' SAHAr 🔍 Update Response Status: ${response.statusCode}');
@@ -153,21 +150,9 @@ class DriverProfileController extends GetxController {
       if (response.statusCode == 200 || response.statusCode == 201) {
         print(' SAHAr ✅ Driver profile updated successfully');
         _showSuccessSnackbar('Profile updated successfully!');
-        // // Update local profile data
-        // driverProfile.value = DriverProfileModel(
-        //   id: driverId,
-        //   name: nameController.text.trim(),
-        //   phoneNumber: phoneController.text.trim(),
-        //   address: addressController.text.trim(),
-        //   licenseNumber: licenseController.text.trim(),
-        //   carLicensePlate: carPlateController.text.trim(),
-        //   carVin: carVinController.text.trim(),
-        //   carRegistration: carRegistrationController.text.trim(),
-        //   carInsurance: carInsuranceController.text.trim(),
-        //   sin: sinController.text.trim(),
-        // );
-        // // Navigate back or to next screen
-        // Get.back(result: {'success': true, 'message': 'Profile updated successfully'});
+
+        // Refresh profile data
+        await fetchDriverProfile();
 
       } else if (response.statusCode == 400) {
         final errorMessage = response.body?['message'] ?? 'Invalid profile data';
@@ -198,6 +183,8 @@ class DriverProfileController extends GetxController {
     carRegistrationController.clear();
     carInsuranceController.clear();
     sinController.clear();
+    vehicleNameController.clear();
+    vehicleColorController.clear();
   }
 
   // Validate phone number
@@ -240,6 +227,11 @@ class DriverProfileController extends GetxController {
     return driverProfile.value?.isComplete ?? false;
   }
 
+  // Check if Stripe is connected
+  bool get hasStripeAccount {
+    return driverProfile.value?.hasStripeAccount ?? false;
+  }
+
   // Helper method to show success snackbar
   void _showSuccessSnackbar(String message) {
     Get.snackbar(
@@ -268,7 +260,6 @@ class DriverProfileController extends GetxController {
 
   @override
   void onClose() {
-    // Dispose controllers
     nameController.dispose();
     phoneController.dispose();
     addressController.dispose();
@@ -278,6 +269,8 @@ class DriverProfileController extends GetxController {
     carRegistrationController.dispose();
     carInsuranceController.dispose();
     sinController.dispose();
+    vehicleNameController.dispose();
+    vehicleColorController.dispose();
     super.onClose();
   }
 }

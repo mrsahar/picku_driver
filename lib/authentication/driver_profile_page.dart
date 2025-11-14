@@ -18,7 +18,6 @@ class DriverProfilePage extends StatelessWidget {
         foregroundColor: Colors.white,
       ),
       body: Obx(() {
-        // Show loading screen while fetching profile
         if (controller.isFetchingProfile.value) {
           return Center(
             child: Column(
@@ -39,6 +38,9 @@ class DriverProfilePage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Stripe Status Banner (if connected)
+                if (controller.hasStripeAccount)
+                  _buildStripeStatusBanner(context),
 
                 // Personal Information Section
                 _buildSectionHeader(context, 'Personal Information', Icons.person),
@@ -63,6 +65,10 @@ class DriverProfilePage extends StatelessWidget {
                 // Vehicle Information Section
                 _buildSectionHeader(context, 'Vehicle Information', Icons.directions_car),
                 SizedBox(height: 16),
+                _buildVehicleNameField(),
+                SizedBox(height: 16),
+                _buildVehicleColorField(),
+                SizedBox(height: 16),
                 _buildCarPlateField(),
                 SizedBox(height: 16),
                 _buildCarVinField(),
@@ -85,7 +91,33 @@ class DriverProfilePage extends StatelessWidget {
     );
   }
 
-
+  Widget _buildStripeStatusBanner(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 20),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.green.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle, color: Colors.green, size: 20),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Stripe account connected - Ready to receive payments',
+              style: TextStyle(
+                color: Colors.green[800],
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
     return Row(
@@ -93,7 +125,7 @@ class DriverProfilePage extends StatelessWidget {
         Container(
           padding: EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Theme.of(context).primaryColor.withValues(alpha:0.1),
+            color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
@@ -184,6 +216,35 @@ class DriverProfilePage extends StatelessWidget {
       keyboardType: TextInputType.number,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       validator: (value) => controller.validateRequired(value, 'SIN'),
+    );
+  }
+
+  Widget _buildVehicleNameField() {
+    return TextFormField(
+      controller: controller.vehicleNameController,
+      decoration: InputDecoration(
+        labelText: 'Vehicle Name *',
+        hintText: 'e.g., Toyota Camry 2020',
+        prefixIcon: Icon(Icons.directions_car),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        helperText: 'Make, Model and Year',
+      ),
+      textCapitalization: TextCapitalization.words,
+      validator: (value) => controller.validateRequired(value, 'Vehicle Name'),
+    );
+  }
+
+  Widget _buildVehicleColorField() {
+    return TextFormField(
+      controller: controller.vehicleColorController,
+      decoration: InputDecoration(
+        labelText: 'Vehicle Color *',
+        hintText: 'e.g., White, Black, Silver',
+        prefixIcon: Icon(Icons.palette),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      textCapitalization: TextCapitalization.words,
+      validator: (value) => controller.validateRequired(value, 'Vehicle Color'),
     );
   }
 

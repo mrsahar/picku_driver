@@ -37,6 +37,8 @@ import 'package:pick_u_driver/driver_screen/screens/verify_message_screen.dart';
 import 'package:pick_u_driver/driver_screen/screens/welcome_screen.dart';
 import 'package:pick_u_driver/driver_screen/shift_time.dart';
 import 'package:pick_u_driver/routes/app_route_observer.dart';
+import '../bindings/driver_feedback_binding.dart';
+import '../driver_screen/screens/driver_feedback_page.dart';
 import 'app_routes.dart';
 
 class AppPages {
@@ -162,7 +164,11 @@ class AppPages {
       page: () => const EarningsPage(),
       binding: EarningsBinding(),
     ),
-
+    GetPage(
+      name: AppRoutes.driverFeedback,
+      page: () => const DriverFeedbackPage(),
+      binding: DriverFeedbackBinding(),
+    ),
     GetPage(
       name: AppRoutes.VERIFY_MESSAGE,
       page: () => VerifyMessageScreen.fromArguments(),

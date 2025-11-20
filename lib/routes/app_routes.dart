@@ -35,5 +35,8 @@ abstract class AppRoutes {
   static const VERIFY_MESSAGE = '/verify-message';
   static const EarningSCREEN = '/earnings';
 
+  //feedback
+  static const driverFeedback = '/driver-feedback';
+
 
   }

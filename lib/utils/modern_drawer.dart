@@ -44,6 +44,11 @@ Widget buildModernDrawer(BuildContext context, bool isDark) {
                 title: 'Shifts',
                 isDark: isDark,
                 onTap: () => Get.toNamed(AppRoutes.shiftApplication),
+              ),_ModernMenuTile(
+                icon: LineAwesomeIcons.calendar_check_solid,
+                title: 'Feedback',
+                isDark: isDark,
+                onTap: () => Get.toNamed(AppRoutes.driverFeedback),
               ),
             ],
           ),

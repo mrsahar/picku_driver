@@ -1,13 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:pick_u_driver/authentication/login_screen.dart';
-import 'package:pick_u_driver/authentication/signup_screen.dart';
 
+import '../../core/auth_service.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/theme/mcolors.dart';
 
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
+
+  @override
+  State<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends State<WelcomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthenticationStatus();
+  }
+
+  /// Check if user is already logged in and redirect to main map
+  Future<void> _checkAuthenticationStatus() async {
+    final isAuthenticated = await AuthService.isAuthenticated();
+
+    if (isAuthenticated && mounted) {
+      // User is logged in, redirect to main map
+      Get.offAllNamed(AppRoutes.MainMap);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

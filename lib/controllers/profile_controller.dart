@@ -35,7 +35,7 @@ class ProfileController extends GetxController {
       }
 
       // API call to get user profile using ApiProvider
-      final response = await _apiProvider.postData('/api/User/single-users/$userId', {});
+      final response = await _apiProvider.postData('/api/Drivers/$userId', {});
 
       print(' SAHAr Response Status Code: ${response.statusCode}');
       print(' SAHAr Response Body: ${response.body}');

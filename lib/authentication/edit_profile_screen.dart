@@ -4,6 +4,26 @@ import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:pick_u_driver/controllers/edit_profile_controller.dart';
 import 'package:pick_u_driver/utils/picku_appbar.dart';
 
+// Section header widget for grouping form fields
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24, bottom: 12),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+}
+
 class EditProfileScreen extends StatelessWidget {
   const EditProfileScreen({super.key});
 
@@ -63,6 +83,9 @@ class EditProfileScreen extends StatelessWidget {
                 key: controller.formKey,
                 child: Column(
                   children: [
+                    // Personal Information Section
+                    _SectionHeader(title: "Personal Information"),
+
                     TextFormField(
                       controller: controller.txtUserName,
                       keyboardType: TextInputType.text,
@@ -80,9 +103,10 @@ class EditProfileScreen extends StatelessWidget {
                       },
                     ),
                     const SizedBox(height: 20),
+
                     TextFormField(
                       controller: controller.txtMobile,
-                      keyboardType: TextInputType.number,
+                      keyboardType: TextInputType.phone,
                       decoration: const InputDecoration(
                         prefixIcon: Icon(LineAwesomeIcons.phone_solid),
                         labelText: "Enter Phone number",
@@ -98,50 +122,219 @@ class EditProfileScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
 
+                    TextFormField(
+                      controller: controller.txtAddress,
+                      keyboardType: TextInputType.streetAddress,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(LineAwesomeIcons.location_arrow_solid),
+                        labelText: "Enter Address",
+                        hintText: "Street Address",
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter address';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 30),
+
+                    // License & Documentation Section
+                    _SectionHeader(title: "License & Documentation"),
+
+                    TextFormField(
+                      controller: controller.txtLicenseNumber,
+                      keyboardType: TextInputType.text,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(LineAwesomeIcons.id_card_solid),
+                        labelText: "Enter License Number",
+                        hintText: "Driver License Number",
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter license number';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    TextFormField(
+                      controller: controller.txtSin,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(LineAwesomeIcons.shield_alt_solid),
+                        labelText: "Social Insurance Number",
+                        hintText: "SIN",
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter SIN';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 30),
+
+                    // Vehicle Information Section
+                    _SectionHeader(title: "Vehicle Information"),
+
+                    TextFormField(
+                      controller: controller.txtVehicleName,
+                      keyboardType: TextInputType.text,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(LineAwesomeIcons.car_solid),
+                        labelText: "Vehicle Name/Model",
+                        hintText: "e.g., Toyota Camry 2020",
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter vehicle name';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    TextFormField(
+                      controller: controller.txtVehicleColor,
+                      keyboardType: TextInputType.text,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(LineAwesomeIcons.palette_solid),
+                        labelText: "Vehicle Color",
+                        hintText: "e.g., Black, White, Red",
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter vehicle color';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    TextFormField(
+                      controller: controller.txtCarLicensePlate,
+                      keyboardType: TextInputType.text,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(LineAwesomeIcons.car_solid),
+                        labelText: "Car License Plate",
+                        hintText: "e.g., ABC-1234",
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter license plate';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    TextFormField(
+                      controller: controller.txtCarVin,
+                      keyboardType: TextInputType.text,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(LineAwesomeIcons.car_solid),
+                        labelText: "Vehicle Identification Number",
+                        hintText: "VIN",
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter VIN';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    TextFormField(
+                      controller: controller.txtCarRegistration,
+                      keyboardType: TextInputType.text,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(LineAwesomeIcons.file_solid),
+                        labelText: "Car Registration Number",
+                        hintText: "Registration Number",
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter registration number';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+
+                    TextFormField(
+                      controller: controller.txtCarInsurance,
+                      keyboardType: TextInputType.text,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(LineAwesomeIcons.file_contract_solid),
+                        labelText: "Car Insurance Number",
+                        hintText: "Insurance Policy Number",
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter insurance number';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 30),
+
                     // -- Form Submit Button
                     Obx(() => ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                      foregroundColor: Colors.white, // Add this line
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(50),
                       ),
                       onPressed: controller.isLoading.value
                           ? null
                           : () => controller.updateProfile(),
                       label: controller.isLoading.value
                           ? const Text("Updating...")
-                          : Text(
-                        "Update Profile".toUpperCase(),
-                      ),
+                          : Text("Update Profile".toUpperCase()),
                       icon: controller.isLoading.value
                           ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                           : const Icon(LineAwesomeIcons.edit),
                     )),
                     const SizedBox(height: 20),
 
-                    // -- Created Date and Delete Button
+                    // -- Delete Button
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          "Want to delete your account?",
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        const Expanded(
+                          child: Text(
+                            "Want to delete your account?",
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(width: 10),
                         Obx(() => ElevatedButton(
                           onPressed: controller.isLoading.value
                               ? null
                               : () => controller.deleteAccount(),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.redAccent.withValues(alpha:0.1),
+                            backgroundColor: Colors.redAccent.withValues(alpha: 0.1),
                             elevation: 0,
                             foregroundColor: Colors.red,
                             shape: const StadiumBorder(),
                             side: BorderSide.none,
-                            minimumSize: const Size(80, 32), // Makes button smaller
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                           ),
                           child: const Text("Delete", style: TextStyle(fontSize: 12)),
                         )),

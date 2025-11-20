@@ -7,6 +7,18 @@ class UserProfileModel {
   final String phoneNumber;
   final bool hasImage;
   final String? profilePicture; // Base64 string
+  final String? email;
+  final String? status;
+  final String? address;
+  final String? licenseNumber;
+  final String? carLicensePlate;
+  final String? carVin;
+  final String? carRegistration;
+  final String? carInsurance;
+  final String? sin;
+  final String? vehicleName;
+  final String? vehicleColor;
+  final String? stripeAccountId;
 
   UserProfileModel({
     required this.userId,
@@ -14,25 +26,62 @@ class UserProfileModel {
     required this.phoneNumber,
     required this.hasImage,
     this.profilePicture,
+    this.email,
+    this.status,
+    this.address,
+    this.licenseNumber,
+    this.carLicensePlate,
+    this.carVin,
+    this.carRegistration,
+    this.carInsurance,
+    this.sin,
+    this.vehicleName,
+    this.vehicleColor,
+    this.stripeAccountId,
   });
 
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
     return UserProfileModel(
-      userId: json['userId'] ?? '',
-      name: json['name'] ?? '',
+      userId: json['id'] ?? json['userId'] ?? json['driverId'] ?? '',
+      name: json['name'] ?? json['fullName'] ?? '',
       phoneNumber: json['phoneNumber'] ?? '',
       hasImage: json['hasImage'] ?? false,
       profilePicture: json['profilePicture'],
+      email: json['email'],
+      status: json['status'],
+      address: json['address'],
+      licenseNumber: json['licenseNumber'],
+      carLicensePlate: json['carLicensePlate'],
+      carVin: json['carVin'],
+      carRegistration: json['carRegistration'],
+      carInsurance: json['carInsurance'],
+      sin: json['sin'],
+      vehicleName: json['vehicleName'],
+      vehicleColor: json['vehicleColor'],
+      stripeAccountId: json['stripeAccountId'],
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'userId': userId,
+      'id': userId,
       'name': name,
       'phoneNumber': phoneNumber,
       'hasImage': hasImage,
       'profilePicture': profilePicture,
+      'email': email,
+      'status': status,
+      'address': address,
+      'licenseNumber': licenseNumber,
+      'carLicensePlate': carLicensePlate,
+      'carVin': carVin,
+      'carRegistration': carRegistration,
+      'carInsurance': carInsurance,
+      'sin': sin,
+      'vehicleName': vehicleName,
+      'vehicleColor': vehicleColor,
+      'stripeAccountId': stripeAccountId,
     };
   }
 

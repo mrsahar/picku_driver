@@ -85,11 +85,11 @@ class ProfileScreen extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   user.name,
-                  style: const TextStyle(fontSize: 16),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 Text(
                   user.phoneNumber,
-                  style: const TextStyle(fontSize: 16),
+                  style: const TextStyle(fontSize: 14),
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
@@ -105,55 +105,55 @@ class ProfileScreen extends StatelessWidget {
                   label: Text("Edit Profile".toUpperCase()),
                   icon: const Icon(LineAwesomeIcons.edit),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 20),
                 const Divider(color: Colors.black12),
-                const SizedBox(height: 10),
+                const SizedBox(height: 20),
 
-                /// -- MENU
-                ProfileMenuWidget(
-                  title: 'Notification',
-                  icon: LineAwesomeIcons.bell_solid,
-                  onPress: () {
-                    Get.toNamed(AppRoutes.notificationScreen);
-                  },
-                ),
-                ProfileMenuWidget(
-                  title: 'Your Rides',
-                  icon: LineAwesomeIcons.car_side_solid,
-                  onPress: () {
-                    Get.toNamed(AppRoutes.rideHistory);
-                  },
-                ),
-                ProfileMenuWidget(
-                  title: 'Pre-Booked Rides',
-                  icon: LineAwesomeIcons.address_book_solid,
-                  onPress: () {
-                    Get.toNamed(AppRoutes.scheduledRideHistory);
-                  },
-                ),
-                ProfileMenuWidget(
-                  title: 'Settings',
-                  icon: LineAwesomeIcons.cog_solid,
-                  onPress: () {
-                    Get.toNamed(AppRoutes.settingsScreen);
-                  },
-                ),
-                ProfileMenuWidget(
-                  title: 'Help Center',
-                  icon: LineAwesomeIcons.broadcast_tower_solid,
-                  onPress: () {
-                    Get.toNamed(AppRoutes.helpCenterScreen);
-                  },
-                ),
-                ProfileMenuWidget(
-                  title: 'Privacy Policy',
-                  icon: LineAwesomeIcons.question_circle_solid,
-                  onPress: () {
-                    Get.toNamed(AppRoutes.privacyPolicy);
-                  },
-                ),
-                const Divider(color: Colors.black12),
-                const SizedBox(height: 10),
+                /// -- PROFILE DETAILS SECTION
+                _buildProfileDetailSection('Personal Information', [
+                  _buildDetailRow('Full Name', user.name),
+                  _buildDetailRow('Phone', user.phoneNumber),
+                  if (user.email != null && user.email!.isNotEmpty)
+                    _buildDetailRow('Email', user.email!),
+                  if (user.status != null && user.status!.isNotEmpty)
+                    _buildDetailRow('Status', user.status!),
+                ]),
+                const SizedBox(height: 20),
+
+                /// -- LICENSE & VEHICLE SECTION
+                if (user.licenseNumber != null && user.licenseNumber!.isNotEmpty ||
+                    user.carLicensePlate != null && user.carLicensePlate!.isNotEmpty ||
+                    user.vehicleName != null && user.vehicleName!.isNotEmpty ||
+                    user.vehicleColor != null && user.vehicleColor!.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildProfileDetailSection('License & Vehicle Information', [
+                        if (user.licenseNumber != null && user.licenseNumber!.isNotEmpty)
+                          _buildDetailRow('License Number', user.licenseNumber!),
+                        if (user.carLicensePlate != null && user.carLicensePlate!.isNotEmpty)
+                          _buildDetailRow('Car License Plate', user.carLicensePlate!),
+                        if (user.vehicleName != null && user.vehicleName!.isNotEmpty)
+                          _buildDetailRow('Vehicle Name', user.vehicleName!),
+                        if (user.vehicleColor != null && user.vehicleColor!.isNotEmpty)
+                          _buildDetailRow('Vehicle Color', user.vehicleColor!),
+                      ]),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+
+                /// -- PAYMENT SECTION
+                if (user.stripeAccountId != null && user.stripeAccountId!.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildProfileDetailSection('Payment Information', [
+                        _buildDetailRow('Stripe Account ID', user.stripeAccountId!),
+                      ]),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+
                 ProfileMenuWidget(
                   title: "Logout",
                   icon: LineAwesomeIcons.sign_out_alt_solid,
@@ -166,6 +166,76 @@ class ProfileScreen extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+
+  /// Helper method to build a profile detail section
+  static Widget _buildProfileDetailSection(String title, List<Widget> details) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.black12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            children: List.generate(
+              details.length,
+              (index) {
+                return Column(
+                  children: [
+                    details[index],
+                    if (index < details.length - 1)
+                      const Divider(height: 1, color: Colors.black12),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Helper method to build a detail row
+  static Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Colors.black54,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

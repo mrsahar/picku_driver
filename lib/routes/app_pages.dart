@@ -1,32 +1,17 @@
 import 'package:get/get.dart';
 import 'package:pick_u_driver/authentication/driver_profile_page.dart';
+import 'package:pick_u_driver/authentication/edit_profile_screen.dart';
 import 'package:pick_u_driver/authentication/forget_password_screen.dart';
 import 'package:pick_u_driver/authentication/login_screen.dart';
 import 'package:pick_u_driver/authentication/otp_screen.dart';
+import 'package:pick_u_driver/authentication/profile_screen.dart';
 import 'package:pick_u_driver/authentication/reset_password_screen.dart';
 import 'package:pick_u_driver/authentication/signup_screen.dart';
+import 'package:pick_u_driver/bindings/chat_binding.dart';
+import 'package:pick_u_driver/bindings/driver_admin_chat_binding.dart';
 import 'package:pick_u_driver/bindings/driver_documents_binding.dart';
 import 'package:pick_u_driver/bindings/driver_profile_binding.dart';
 import 'package:pick_u_driver/bindings/earnings_binding.dart';
-import 'package:pick_u_driver/bindings/forgot_password_binding.dart';
-import 'package:pick_u_driver/bindings/login_binding.dart';
-import 'package:pick_u_driver/bindings/otp_binding.dart';
-import 'package:pick_u_driver/bindings/reset_password_binding.dart';
-import 'package:pick_u_driver/bindings/shift_application_binding.dart';
-import 'package:pick_u_driver/bindings/signup_binding.dart';
-import 'package:pick_u_driver/driver_screen/driver_documents_page.dart';
-import 'package:pick_u_driver/driver_screen/earnings_page.dart';
-import 'package:pick_u_driver/driver_screen/screens/verify_message_screen.dart';
-import 'package:pick_u_driver/routes/app_route_observer.dart';
-import 'package:pick_u_driver/driver_screen/main_map.dart';
-import 'package:pick_u_driver/driver_screen/shift_time.dart';
-import '../bindings/driver_admin_chat_binding.dart';
-import '../driver_screen/driver_admin_chat_screen.dart';
-import '../driver_screen/screens/welcome_screen.dart';
-import 'app_routes.dart';
-import 'package:pick_u_driver/authentication/edit_profile_screen.dart'; 
-import 'package:pick_u_driver/authentication/profile_screen.dart'; 
-import 'package:pick_u_driver/bindings/chat_binding.dart';
 import 'package:pick_u_driver/bindings/edit_profile_binding.dart';
 import 'package:pick_u_driver/bindings/forgot_password_binding.dart';
 import 'package:pick_u_driver/bindings/login_binding.dart';
@@ -35,9 +20,12 @@ import 'package:pick_u_driver/bindings/profile_binding.dart';
 import 'package:pick_u_driver/bindings/reset_password_binding.dart';
 import 'package:pick_u_driver/bindings/ride_history_binding.dart';
 import 'package:pick_u_driver/bindings/scheduled_ride_history_binding.dart';
+import 'package:pick_u_driver/bindings/shift_application_binding.dart';
 import 'package:pick_u_driver/bindings/signup_binding.dart';
-import 'package:pick_u_driver/routes/app_route_observer.dart';
 import 'package:pick_u_driver/driver_screen/chat_screen.dart';
+import 'package:pick_u_driver/driver_screen/driver_admin_chat_screen.dart';
+import 'package:pick_u_driver/driver_screen/driver_documents_page.dart';
+import 'package:pick_u_driver/driver_screen/earnings_page.dart';
 import 'package:pick_u_driver/driver_screen/history/history_screen.dart';
 import 'package:pick_u_driver/driver_screen/main_map.dart';
 import 'package:pick_u_driver/driver_screen/scheduled/scheduled_ride_history_page.dart';
@@ -45,6 +33,11 @@ import 'package:pick_u_driver/driver_screen/screens/help_center_screen.dart';
 import 'package:pick_u_driver/driver_screen/screens/notification_screen.dart';
 import 'package:pick_u_driver/driver_screen/screens/privacy_policy_screen.dart';
 import 'package:pick_u_driver/driver_screen/screens/setting_screen.dart';
+import 'package:pick_u_driver/driver_screen/screens/verify_message_screen.dart';
+import 'package:pick_u_driver/driver_screen/screens/welcome_screen.dart';
+import 'package:pick_u_driver/driver_screen/shift_time.dart';
+import 'package:pick_u_driver/routes/app_route_observer.dart';
+import 'app_routes.dart';
 
 class AppPages {
   AppPages._();
@@ -78,6 +71,11 @@ class AppPages {
       name: AppRoutes.profileScreen,
       page: () => const ProfileScreen(),
       binding: ProfileBinding(), // Add login binding
+    ),
+    GetPage(
+      name: AppRoutes.editProfile,
+      page: () => const EditProfileScreen(),
+      binding: EditProfileBinding(),
     ),
     GetPage(
       name: AppRoutes.MainMap,

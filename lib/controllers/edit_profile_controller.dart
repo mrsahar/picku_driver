@@ -15,6 +15,15 @@ class EditProfileController extends GetxController {
   // Form controllers
   final TextEditingController txtUserName = TextEditingController();
   final TextEditingController txtMobile = TextEditingController();
+  final TextEditingController txtAddress = TextEditingController();
+  final TextEditingController txtLicenseNumber = TextEditingController();
+  final TextEditingController txtCarLicensePlate = TextEditingController();
+  final TextEditingController txtCarVin = TextEditingController();
+  final TextEditingController txtCarRegistration = TextEditingController();
+  final TextEditingController txtCarInsurance = TextEditingController();
+  final TextEditingController txtSin = TextEditingController();
+  final TextEditingController txtVehicleName = TextEditingController();
+  final TextEditingController txtVehicleColor = TextEditingController();
 
   // Form key for validation
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
@@ -38,6 +47,15 @@ class EditProfileController extends GetxController {
   void onClose() {
     txtUserName.dispose();
     txtMobile.dispose();
+    txtAddress.dispose();
+    txtLicenseNumber.dispose();
+    txtCarLicensePlate.dispose();
+    txtCarVin.dispose();
+    txtCarRegistration.dispose();
+    txtCarInsurance.dispose();
+    txtSin.dispose();
+    txtVehicleName.dispose();
+    txtVehicleColor.dispose();
     super.onClose();
   }
 
@@ -51,6 +69,15 @@ class EditProfileController extends GetxController {
         // Set form field values
         txtUserName.text = userData.name;
         txtMobile.text = userData.phoneNumber;
+        txtAddress.text = userData.address ?? '';
+        txtLicenseNumber.text = userData.licenseNumber ?? '';
+        txtCarLicensePlate.text = userData.carLicensePlate ?? '';
+        txtCarVin.text = userData.carVin ?? '';
+        txtCarRegistration.text = userData.carRegistration ?? '';
+        txtCarInsurance.text = userData.carInsurance ?? '';
+        txtSin.text = userData.sin ?? '';
+        txtVehicleName.text = userData.vehicleName ?? '';
+        txtVehicleColor.text = userData.vehicleColor ?? '';
 
         // Set current profile image if available
         if (userData.hasProfilePicture) {
@@ -211,29 +238,42 @@ class EditProfileController extends GetxController {
   // Update user profile
   Future<void> updateProfile() async {
     try {
+      if (!validateForm()) return;
+
       isLoading.value = true;
       final userId = user.value?.userId ?? '';
-      final fullName = txtUserName.text.trim();
-      final phoneNumber = txtMobile.text.trim();
       final imagePath = selectedImagePath.value;
+
       // Create FormData manually
       final formData = FormData({});
 
       formData.fields.addAll([
         MapEntry('UserId', userId),
-        MapEntry('FullName', fullName),
-        MapEntry('PhoneNumber', phoneNumber),
+        MapEntry('FullName', txtUserName.text.trim()),
+        MapEntry('PhoneNumber', txtMobile.text.trim()),
+        MapEntry('Address', txtAddress.text.trim()),
+        MapEntry('LicenseNumber', txtLicenseNumber.text.trim()),
+        MapEntry('CarLicensePlate', txtCarLicensePlate.text.trim()),
+        MapEntry('CarVin', txtCarVin.text.trim()),
+        MapEntry('CarRegistration', txtCarRegistration.text.trim()),
+        MapEntry('CarInsurance', txtCarInsurance.text.trim()),
+        MapEntry('Sin', txtSin.text.trim()),
+        MapEntry('VehicleName', txtVehicleName.text.trim()),
+        MapEntry('VehicleColor', txtVehicleColor.text.trim()),
       ]);
 
-      formData.files.add(
-        MapEntry(
-          'ProfileImage',
-          MultipartFile(
-            File(imagePath),
-            filename: 'profile.jpg',
+      // Only add profile image if a new one was selected
+      if (imagePath.isNotEmpty) {
+        formData.files.add(
+          MapEntry(
+            'ProfileImage',
+            MultipartFile(
+              File(imagePath),
+              filename: 'profile.jpg',
+            ),
           ),
-        ),
-      );
+        );
+      }
 
       // 🔍 SAHAr Debug: Print FormData contents
       print(' SAHAr ⚠️ FormData Fields:');
@@ -245,13 +285,18 @@ class EditProfileController extends GetxController {
       });
 
       // Send multipart request using your updated ApiProvider
-      final response = await _apiProvider.postData2('/api/User/update-user', formData);
+      final response = await _apiProvider.postData2('/api/Drivers/update-profile', formData);
 
       // 🔍 SAHAr Debug: Response
       print(' SAHAr ✅ Response Status: ${response.statusCode}');
       print(' SAHAr ✅ Response Body: ${response.bodyString}');
 
       if (response.statusCode == 200 || response.isOk) {
+        // Update local user object with new data
+        if (response.body != null && response.body is Map) {
+          user.value = UserProfileModel.fromJson(response.body);
+        }
+
         Get.snackbar(
           'Success',
           'Profile updated successfully',

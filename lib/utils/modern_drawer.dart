@@ -100,8 +100,7 @@ Widget buildModernDrawer(BuildContext context, bool isDark) {
               ),
             ],
           ),
-
-          const Spacer(),
+          const SizedBox(height: 12),
 
           // Logout Section
           Padding(
@@ -168,7 +167,7 @@ Widget _buildDrawerHeader(BuildContext context, bool isDark) {
         FutureBuilder<String?>(
           future: SharedPrefsService.getUserFullName(),
           builder: (context, snapshot) {
-            final userName = snapshot.data ?? 'Guest User';
+            final userName = snapshot.data?.toUpperCase() ?? 'Guest User';
             final isLoading = snapshot.connectionState == ConnectionState.waiting;
 
             return Row(

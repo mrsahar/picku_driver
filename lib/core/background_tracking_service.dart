@@ -53,7 +53,7 @@ class BackgroundTrackingService extends GetxService {
   Timer? _reconnectionTimer;
 
   // Configuration
-  static const String _hubUrl = 'http://pickurides.com/ridechathub';
+  static const String _hubUrl = 'http://pickurides.com/ridechathub/';
   static const String _emptyGuid = '00000000-0000-0000-0000-000000000000';
   static const double _minimumDistanceFilter = 10.0; // meters
   static const int _locationUpdateIntervalSeconds = 5;
@@ -1211,7 +1211,7 @@ class BackgroundTrackingService extends GetxService {
 
       await _hubConnection!.invoke(
         'UpdateLocation',
-        args: [rideId, _driverId, _driverName, latitude, longitude],
+        args: [rideId, _driverId, latitude, longitude],
       );
 
       locationUpdateCount.value++;

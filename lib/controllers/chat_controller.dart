@@ -17,6 +17,9 @@ class ChatController extends GetxController {
   final RxBool isSending = false.obs;
   final RxBool isLoadingMessages = false.obs;
 
+  // Track recently sent messages to avoid duplicates (message text -> timestamp)
+  final Map<String, DateTime> _recentlySentMessages = {};
+
   // Message input
   final TextEditingController messageController = TextEditingController();
   final ScrollController scrollController = ScrollController();
@@ -145,6 +148,19 @@ class ChatController extends GetxController {
       final chatMessage = ChatMessage.fromJson(messageData);
       final isFromCurrentUser = chatMessage.senderId == currentUserId.value;
 
+      // Check if this is a duplicate of a message we just sent
+      if (isFromCurrentUser && _recentlySentMessages.containsKey(chatMessage.message)) {
+        final sentTime = _recentlySentMessages[chatMessage.message]!;
+        final timeDifference = chatMessage.dateTime.difference(sentTime).abs();
+
+        // If the message was sent within the last 3 seconds, it's likely a duplicate
+        if (timeDifference.inSeconds < 3) {
+          print(' SAHAr Skipping duplicate message (echo from server): ${chatMessage.message}');
+          _recentlySentMessages.remove(chatMessage.message);
+          return;
+        }
+      }
+
       final messageWithUserFlag = chatMessage.copyWith(
         isFromCurrentUser: isFromCurrentUser,
       );
@@ -241,7 +257,6 @@ class ChatController extends GetxController {
 
   Future<void> sendMessage() async {
     final messageText = messageController.text.trim();
-
     if (messageText.isEmpty) {
       return;
     }
@@ -263,10 +278,43 @@ class ChatController extends GetxController {
       print(' SAHAr RideId: ${rideId.value}');
       print(' SAHAr SenderId: ${currentUserId.value}');
 
-      // Send only via SignalR
+      // Create the message to send
+      final now = DateTime.now();
+      final newMessage = ChatMessage(
+        senderId: currentUserId.value,
+        message: messageText,
+        dateTime: now,
+        isFromCurrentUser: true,
+      );
+
+      // Add message optimistically to UI
+      messages.add(newMessage);
+
+      // Track this message to avoid adding it again when server echoes it back
+      _recentlySentMessages[messageText] = now;
+
+      // Clean up old tracked messages after 5 seconds
+      Future.delayed(const Duration(seconds: 5), () {
+        _recentlySentMessages.remove(messageText);
+      });
+
+      // Scroll to bottom
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (scrollController.hasClients) {
+          scrollController.animateTo(
+            scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+
+      // Send via SignalR
+      // Note: Server expects rideId, senderId, senderRole, message
       await hubConnection?.invoke('SendMessage', args: [
         rideId.value,
         currentUserId.value,
+        'Driver', // senderRole
         messageText,
       ]);
 
@@ -277,6 +325,12 @@ class ChatController extends GetxController {
 
     } catch (e) {
       print(' SAHAr Failed to send message: $e');
+
+      // Remove the optimistically added message on error
+      if (messages.isNotEmpty && messages.last.message == messageText) {
+        messages.removeLast();
+      }
+
       Get.snackbar('Send Error', 'Failed to send message via SignalR');
     } finally {
       isSending.value = false;

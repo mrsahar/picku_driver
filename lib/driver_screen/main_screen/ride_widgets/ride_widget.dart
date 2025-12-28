@@ -64,7 +64,6 @@ class RideWidget extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 22,
-                backgroundColor: MColor.primaryNavy.withValues(alpha:0.1),
                 child: Text(
                   ride.passengerName.isNotEmpty
                       ? ride.passengerName[0].toUpperCase()

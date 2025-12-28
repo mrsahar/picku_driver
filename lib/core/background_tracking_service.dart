@@ -7,6 +7,8 @@ import 'package:pick_u_driver/controllers/active_ride_controller.dart';
 import 'package:pick_u_driver/core/google_directions_service.dart';
 import 'package:pick_u_driver/core/location_service.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
+import 'package:pick_u_driver/core/global_variables.dart';
+import 'package:pick_u_driver/core/ride_notification_service.dart';
 import 'package:pick_u_driver/driver_screen/widget/modern_payment_dialog.dart';
 import 'package:pick_u_driver/models/ride_assignment_model.dart'; 
 import 'package:pick_u_driver/routes/app_routes.dart';
@@ -20,6 +22,17 @@ class BackgroundTrackingService extends GetxService {
 
   // Services
   final LocationService _locationService = LocationService.to;
+
+  // Get ride notification service
+  RideNotificationService? get _rideNotificationService {
+    try {
+      return Get.isRegistered<RideNotificationService>()
+          ? RideNotificationService.to
+          : null;
+    } catch (e) {
+      return null;
+    }
+  }
 
   // SignalR connection (single connection for everything)
   HubConnection? _hubConnection;
@@ -132,19 +145,37 @@ class BackgroundTrackingService extends GetxService {
     }
   }
 
-  /// Initialize SignalR connection
+  /// Initialize SignalR connection with JWT authentication
   Future<void> _initializeConnection() async {
     try {
+      // Get JWT token from GlobalVariables
+      final jwtToken = GlobalVariables.instance.userToken;
+
+      if (jwtToken.isEmpty) {
+        print('⚠️ SAHAr No JWT token available for SignalR connection');
+        connectionStatus.value = 'No token available';
+        throw Exception('JWT token is required for SignalR connection');
+      }
+
+      print('🔐 SAHAr Initializing SignalR with JWT authentication');
+
       _hubConnection = HubConnectionBuilder()
-          .withUrl(_hubUrl)
+          .withUrl(
+            _hubUrl,
+            HttpConnectionOptions(
+              accessTokenFactory: () async => jwtToken,
+              logging: (level, message) => print('SignalR: $message'),
+            ),
+          )
           .withAutomaticReconnect([2000, 5000, 10000, 15000, 30000])
           .build();
 
       _setupConnectionHandlers();
-      print('✅ SAHAr SignalR hub initialized');
+      print('✅ SAHAr SignalR hub initialized with JWT');
     } catch (e) {
       print('❌ SAHAr Error initializing SignalR: $e');
       connectionStatus.value = 'Error: $e';
+      rethrow; // Propagate the error so startBackgroundService can handle it
     }
   }
 
@@ -433,16 +464,12 @@ class BackgroundTrackingService extends GetxService {
                           _resetRide(); // Clear everything
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: MColor.primaryNavy.withValues(alpha:0.1),
-                          foregroundColor: MColor.primaryNavy,
+                          backgroundColor: MColor.primaryNavy,
+                          foregroundColor: Colors.white,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(
-                              color: MColor.primaryNavy.withValues(alpha:0.2),
-                              width: 1,
-                            ),
                           ),
                         ),
                         child: const Text(
@@ -837,7 +864,7 @@ class BackgroundTrackingService extends GetxService {
       rideStatus.value = ride.status;
       currentRideId.value = ride.rideId;
 
-      _showRideNotification(ride);
+      //_showRideNotification(ride);
       _updateUIForRideStatus(ride);
 
       print('🚕 SAHAr Ride ${ride.rideId} - ${ride.status}');
@@ -895,61 +922,64 @@ class BackgroundTrackingService extends GetxService {
     }
   }
 
-  void _showRideNotification(RideAssignment ride) {
-    // Don't show notification if we're already handling payment completion
-    if (ride.status == 'Completed' && ride.payment == 'Successful' && paymentCompleted.value) {
-      print('🔕 SAHAr Skipping notification - payment already completed');
-      return;
-    }
+  // void _showRideNotification(RideAssignment ride) {
+  //   // Don't show notification if we're already handling payment completion
+  //   if (ride.status == 'Completed' && ride.payment == 'Successful' && paymentCompleted.value) {
+  //     print('🔕 SAHAr Skipping notification - payment already completed');
+  //     return;
+  //   }
+  //
+  //   String title = '';
+  //   String message = '';
+  //   Color bgColor = Colors.blue.shade100;
+  //   Color textColor = Colors.blue.shade800;
+  //   IconData icon = Icons.directions_car;
+  //
+  //   switch (ride.status) {
+  //     case 'Waiting':
+  //       title = 'New Ride Request!';
+  //       message = 'Pickup: ${ride.pickupLocation}';
+  //       bgColor = Colors.orange.shade100;
+  //       textColor = Colors.orange.shade800;
+  //       icon = Icons.schedule;
+  //       break;
+  //     case 'In-Progress':
+  //       title = 'Ride Started';
+  //       message = 'Heading to: ${ride.dropoffLocation}';
+  //       bgColor = Colors.blue.shade100;
+  //       textColor = Colors.blue.shade800;
+  //       icon = Icons.directions_car;
+  //       break;
+  //     case 'Completed':
+  //       // Only show notification if payment is not yet successful
+  //       if (ride.payment != 'Successful') {
+  //         title = 'Ride Completed';
+  //         message = 'Waiting for payment...';
+  //         bgColor = Colors.green.shade100;
+  //         textColor = Colors.green.shade800;
+  //         icon = Icons.check_circle;
+  //       } else {
+  //         // Payment is successful, don't show notification as popup will handle it
+  //         return;
+  //       }
+  //       break;
+  //   }
+  //
+  //   Get.snackbar(
+  //     title,
+  //     message,
+  //     backgroundColor: bgColor,
+  //     colorText: textColor,
+  //     duration: const Duration(seconds: 5),
+  //     icon: Icon(icon, color: textColor),
+  //   );
+  // }
 
-    String title = '';
-    String message = '';
-    Color bgColor = Colors.blue.shade100;
-    Color textColor = Colors.blue.shade800;
-    IconData icon = Icons.directions_car;
-
-    switch (ride.status) {
-      case 'Waiting':
-        title = 'New Ride Request!';
-        message = 'Pickup: ${ride.pickupLocation}';
-        bgColor = Colors.orange.shade100;
-        textColor = Colors.orange.shade800;
-        icon = Icons.schedule;
-        break;
-      case 'In-Progress':
-        title = 'Ride Started';
-        message = 'Heading to: ${ride.dropoffLocation}';
-        bgColor = Colors.blue.shade100;
-        textColor = Colors.blue.shade800;
-        icon = Icons.directions_car;
-        break;
-      case 'Completed':
-        // Only show notification if payment is not yet successful
-        if (ride.payment != 'Successful') {
-          title = 'Ride Completed';
-          message = 'Waiting for payment...';
-          bgColor = Colors.green.shade100;
-          textColor = Colors.green.shade800;
-          icon = Icons.check_circle;
-        } else {
-          // Payment is successful, don't show notification as popup will handle it
-          return;
-        }
-        break;
-    }
-
-    Get.snackbar(
-      title,
-      message,
-      backgroundColor: bgColor,
-      colorText: textColor,
-      duration: const Duration(seconds: 5),
-      icon: Icon(icon, color: textColor),
-    );
-  }
-
-  /// Update UI for ride status
+  /// Update UI for ride status and trigger notifications
   void _updateUIForRideStatus(RideAssignment ride) {
+    // Trigger notification based on status
+    _triggerRideNotification(ride);
+
     switch (ride.status) {
       case 'Waiting':
         _showRouteToPickup(ride);
@@ -959,6 +989,36 @@ class BackgroundTrackingService extends GetxService {
         break;
       case 'Completed':
         _showCompletedRide(ride);
+        break;
+    }
+  }
+
+  /// Trigger notification with vibration and sound based on ride status
+  void _triggerRideNotification(RideAssignment ride) {
+    if (_rideNotificationService == null) {
+      print('⚠️ SAHAr Ride notification service not available');
+      return;
+    }
+
+    switch (ride.status) {
+      case 'Waiting':
+        _rideNotificationService!.notifyNewRide(
+          rideId: ride.rideId,
+          pickupLocation: ride.pickupLocation,
+          passengerName: ride.passengerName,
+        );
+        break;
+      case 'In-Progress':
+        _rideNotificationService!.notifyRideInProgress(
+          rideId: ride.rideId,
+          destination: ride.dropoffLocation,
+        );
+        break;
+      case 'Completed':
+        _rideNotificationService!.notifyRideCompleted(
+          rideId: ride.rideId,
+          fare: ride.fareFinal,
+        );
         break;
     }
   }
@@ -1215,8 +1275,7 @@ class BackgroundTrackingService extends GetxService {
       );
 
       locationUpdateCount.value++;
-      print('📍 SAHAr Location sent (${locationUpdateCount.value}) for driver: $_driverName ($_driverId)');
-      return true;
+     return true;
     } catch (e) {
       print('❌ SAHAr Location send error: $e');
       return false;

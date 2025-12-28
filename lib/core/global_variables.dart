@@ -1,5 +1,6 @@
 // lib/app/core/utils/global_variables.dart
 import 'package:get/get.dart';
+import 'package:pick_u_driver/core/sharePref.dart';
 
 class GlobalVariables extends GetxController {
   static GlobalVariables get instance => Get.find<GlobalVariables>();
@@ -29,6 +30,7 @@ class GlobalVariables extends GetxController {
     super.onInit();
     _loadStoredData();
   }
+
   void setUserEmail(String email) { // ✅ Added email setter
     _userEmail.value = email;
   }
@@ -37,7 +39,43 @@ class GlobalVariables extends GetxController {
     _userId.value = id;
   }
 
-  void _loadStoredData() {
+  /// Load stored user data from SharedPreferences on app startup
+  Future<void> _loadStoredData() async {
+    try {
+      print('🔄 SAHAr Loading stored user data...');
+
+      final userData = await SharedPrefsService.getUserData();
+      final token = userData['token'];
+      final email = userData['email'];
+      final userId = userData['userId'];
+      final isLoggedInStr = userData['isLoggedIn'];
+
+      if (token != null && token.isNotEmpty) {
+        _userToken.value = token;
+        print('✅ SAHAr Token loaded from storage: ${token.substring(0, 20)}...');
+      } else {
+        print('⚠️ SAHAr No token found in storage');
+      }
+
+      if (email != null && email.isNotEmpty) {
+        _userEmail.value = email;
+        print('✅ SAHAr Email loaded: $email');
+      }
+
+      if (userId != null && userId.isNotEmpty) {
+        _userId.value = userId;
+        print('✅ SAHAr User ID loaded: $userId');
+      }
+
+      if (isLoggedInStr == 'true') {
+        _isLoggedIn.value = true;
+        print('✅ SAHAr Login status: true');
+      }
+
+      print('✅ SAHAr GlobalVariables initialized with stored data');
+    } catch (e) {
+      print('❌ SAHAr Error loading stored data: $e');
+    }
   }
 
   // Setters

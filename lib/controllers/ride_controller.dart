@@ -75,7 +75,6 @@ class RideController extends GetxController {
         Get.snackbar(
           "Stop Requested",
           "Timer started for waiting time",
-          backgroundColor: MColor.primaryNavy.withValues(alpha:0.1),
           colorText: MColor.primaryNavy,
           icon: Icon(Icons.pause_circle_filled, color: MColor.primaryNavy),
         );

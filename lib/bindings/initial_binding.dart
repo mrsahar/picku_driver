@@ -7,7 +7,9 @@ import 'package:pick_u_driver/providers/api_provider.dart';
 import '../core/location_service.dart';
 import '../core/map_service.dart';
 import '../core/permission_service.dart';
-import '../core/signalr_service.dart';
+import '../core/unified_signalr_service.dart';
+import '../core/chat_notification_service.dart';
+import '../core/ride_notification_service.dart';
 
 class InitialBinding extends Bindings {
   @override
@@ -17,9 +19,11 @@ class InitialBinding extends Bindings {
     Get.put(PermissionService(), permanent: true);
     Get.put(LocationService(), permanent: true);
     Get.put(MapService(), permanent: true);
+    Get.put(ChatNotificationService(), permanent: true);
+    Get.put(RideNotificationService(), permanent: true);
     Get.put(BackgroundTrackingService(), permanent: true);
     // ActiveRideController removed - will be initialized after connection check
-    // remove this line if not using SignalR
-    Get.put(SignalRService(), permanent: true);
+    // Unified SignalR service with JWT authentication
+    Get.put(UnifiedSignalRService(), permanent: true);
   }
 }

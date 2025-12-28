@@ -1,11 +1,13 @@
 class ChatMessage {
   final String senderId;
+  final String senderRole="Driver";
   final String message;
   final DateTime dateTime;
   final bool isFromCurrentUser;
 
   ChatMessage({
     required this.senderId,
+    required String senderRole,
     required this.message,
     required this.dateTime,
     this.isFromCurrentUser = false,
@@ -14,6 +16,7 @@ class ChatMessage {
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     return ChatMessage(
       senderId: json['senderId'] ?? '',
+      senderRole:"Driver",
       message: json['message'] ?? '',
       dateTime: DateTime.tryParse(json['dateTime'] ?? '') ?? DateTime.now(),
     );
@@ -37,6 +40,7 @@ class ChatMessage {
   }) {
     return ChatMessage(
       senderId: senderId ?? this.senderId,
+      senderRole:"Driver",
       message: message ?? this.message,
       dateTime: dateTime ?? this.dateTime,
       isFromCurrentUser: isFromCurrentUser ?? this.isFromCurrentUser,

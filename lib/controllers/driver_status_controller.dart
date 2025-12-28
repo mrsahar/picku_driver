@@ -81,9 +81,14 @@ class DriverStatusController extends GetxController {
   /// Set driver online - Start background service
   Future<void> _goOnline() async {
     try {
+      print('🔄 SAHAr Attempting to go online...');
+      print('🔄 SAHAr Driver ID: $_driverId');
+      print('🔄 SAHAr Driver Name: $_driverName');
+
       bool success = await _backgroundService.startBackgroundService();
 
       if (!success) {
+        print('❌ SAHAr Background service returned false');
         throw Exception('Failed to start background service');
       }
 
@@ -100,7 +105,19 @@ class DriverStatusController extends GetxController {
       print('✅ SAHAr Driver is now online');
     } catch (e) {
       print('❌ SAHAr Error going online: $e');
-      throw Exception('Failed to go online: $e');
+      print('❌ SAHAr Stack trace: ${StackTrace.current}');
+
+      // Provide more specific error messages
+      String errorMessage = 'Failed to go online';
+      if (e.toString().contains('JWT token')) {
+        errorMessage = 'Please login again to continue';
+      } else if (e.toString().contains('connect')) {
+        errorMessage = 'Cannot connect to server. Check your internet connection';
+      } else if (e.toString().contains('permission')) {
+        errorMessage = 'Location permission is required';
+      }
+
+      throw Exception('$errorMessage: $e');
     }
   }
 

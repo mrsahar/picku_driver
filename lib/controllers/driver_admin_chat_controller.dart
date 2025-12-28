@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:signalr_core/signalr_core.dart';
-
+import 'package:pick_u_driver/core/unified_signalr_service.dart';
 import '../core/sharePref.dart';
 import '../models/chat_message_model.dart';
 
 class DriverAdminChatController extends GetxController {
-  // SignalR Connection
-  HubConnection? _hubConnection;
+  // Use Unified SignalR Service
+  final UnifiedSignalRService _signalRService = UnifiedSignalRService.to;
 
   // Observable variables
   final messages = <ChatMessage>[].obs;
-  final isConnected = false.obs;
   final isLoading = false.obs;
-  final isSending = false.obs;
   final messageController = TextEditingController();
   final scrollController = ScrollController();
 
@@ -21,9 +18,6 @@ class DriverAdminChatController extends GetxController {
   String? driverId;
   String? senderId;
   final senderRole = 'Driver';
-
-  // Hub URL - CHANGE THIS TO YOUR BACKEND URL
-  final String hubUrl = 'http://pickurides.com/ridechathub';
 
   @override
   void onInit() {
@@ -51,8 +45,20 @@ class DriverAdminChatController extends GetxController {
         return;
       }
 
-      // Initialize SignalR connection
-      await _setupSignalR();
+      // Ensure SignalR is connected
+      if (!_signalRService.isConnected.value) {
+        await _signalRService.connect();
+      }
+
+      // Bind to unified service's admin chat messages
+      ever(_signalRService.adminChatMessages, (msgs) {
+        messages.value = msgs;
+        _scrollToBottom();
+      });
+
+      // Join driver support and load history
+      await _signalRService.joinDriverSupport();
+      await _signalRService.loadDriverAdminChatHistory();
 
     } catch (e) {
       print('💥 Chat initialization error: $e');
@@ -68,85 +74,12 @@ class DriverAdminChatController extends GetxController {
     }
   }
 
-  Future<void> _setupSignalR() async {
-    try {
-      _hubConnection = HubConnectionBuilder()
-          .withUrl(hubUrl)
-          .withAutomaticReconnect()
-          .build();
-
-      _hubConnection?.on('ReceiveDriverAdminMessage', _handleNewMessage);
-      _hubConnection?.on('ReceiveDriverAdminChatHistory', _handleChatHistory);
-
-      await _hubConnection?.start();
-      isConnected.value = true;
-      print('✅ Connected to SignalR hub');
-
-      await _joinDriverSupport();
-      await _loadChatHistory();
-
-    } catch (e) {
-      print('❌ SignalR connection error: $e');
-      isConnected.value = false;
-    }
-  }
-
-  void _handleNewMessage(List<Object?>? args) {
-    if (args == null || args.isEmpty) return;
-
-    try {
-      final messageData = args[0] as Map<String, dynamic>;
-      final newMessage = ChatMessage.fromJson(messageData);
-      messages.add(newMessage);
-      _scrollToBottom();
-      print('📨 New message received: ${newMessage.message}');
-    } catch (e) {
-      print('Error handling message: $e');
-    }
-  }
-
-  void _handleChatHistory(List<Object?>? args) {
-    if (args == null || args.isEmpty) return;
-
-    try {
-      final historyList = args[0] as List<dynamic>;
-      messages.clear();
-
-      for (var item in historyList) {
-        final message = ChatMessage.fromJson(item as Map<String, dynamic>);
-        messages.add(message);
-      }
-
-      _scrollToBottom();
-      print('📜 Loaded ${messages.length} messages from history');
-    } catch (e) {
-      print('Error handling history: $e');
-    }
-  }
-
-  Future<void> _joinDriverSupport() async {
-    try {
-      await _hubConnection?.invoke('JoinDriverSupport', args: [driverId]);
-      print('🔔 Joined driver support group for: $driverId');
-    } catch (e) {
-      print('Failed to join driver support: $e');
-    }
-  }
-
-  Future<void> _loadChatHistory() async {
-    try {
-      await _hubConnection?.invoke('GetDriverAdminChatHistory', args: [driverId]);
-    } catch (e) {
-      print('Failed to load chat history: $e');
-    }
-  }
-
   Future<void> sendMessage() async {
     final messageText = messageController.text.trim();
 
     if (messageText.isEmpty) return;
 
-    if (!isConnected.value) {
+    if (!_signalRService.isConnected.value) {
       Get.snackbar(
         'Not Connected',
         'Please wait for connection',
@@ -158,18 +91,9 @@ class DriverAdminChatController extends GetxController {
     }
 
     try {
-      isSending.value = true;
-
-      await _hubConnection?.invoke(
-        'SendDriverAdminMessage',
-        args: [driverId, senderId, senderRole, messageText],
-      );
-
+      await _signalRService.sendDriverAdminMessage(messageText);
       messageController.clear();
       print('📤 Message sent: $messageText');
-
-      await _loadChatHistory();
-
     } catch (e) {
       print('Failed to send message: $e');
       Get.snackbar(
@@ -179,13 +103,17 @@ class DriverAdminChatController extends GetxController {
         backgroundColor: Colors.red[100],
         colorText: Colors.red[900],
       );
-    } finally {
-      isSending.value = false;
     }
   }
 
   Future<void> retryConnection() async {
-    await _setupSignalR();
+    if (!_signalRService.isConnected.value) {
+      await _signalRService.connect();
+      if (driverId != null && driverId!.isNotEmpty) {
+        await _signalRService.joinDriverSupport();
+        await _signalRService.loadDriverAdminChatHistory();
+      }
+    }
   }
 
   void _scrollToBottom() {
@@ -200,11 +128,16 @@ class DriverAdminChatController extends GetxController {
     });
   }
 
+  // Computed properties for UI bindings
+  RxBool get isConnected => _signalRService.isConnected;
+  RxBool get isSending => _signalRService.isAdminChatSending;
+
   @override
   void onClose() {
     messageController.dispose();
     scrollController.dispose();
-    _hubConnection?.stop();
+    _signalRService.clearAdminChatMessages();
     super.onClose();
   }
 }
+

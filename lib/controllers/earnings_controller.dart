@@ -5,7 +5,7 @@ import 'package:pick_u_driver/models/earnings_model.dart';
 import 'package:pick_u_driver/providers/api_provider.dart';
 
 class EarningsController extends GetxController {
-  final ApiProvider _apiProvider = ApiProvider();
+  final ApiProvider _apiProvider = Get.find<ApiProvider>();
 
   final RxBool isLoading = false.obs;
   final RxBool hasError = false.obs;

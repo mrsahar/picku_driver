@@ -9,6 +9,8 @@ import 'package:pick_u_driver/controllers/driver_status_controller.dart';
 import 'package:pick_u_driver/core/location_service.dart';
 import 'package:pick_u_driver/core/map_service.dart';
 import 'package:pick_u_driver/core/permission_service.dart';
+import 'package:pick_u_driver/core/chat_notification_service.dart';
+import 'package:pick_u_driver/core/ride_notification_service.dart';
 import 'package:pick_u_driver/utils/map_theme/dark_map_theme.dart';
 import 'package:pick_u_driver/utils/map_theme/light_map_theme.dart';
 import 'ride_widgets/ride_widget.dart';
@@ -29,6 +31,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final LocationService _locationService = LocationService.to;
   final MapService _mapService = MapService.to;
   final PermissionService _permissionService = PermissionService.to;
+  final ChatNotificationService _notificationService = ChatNotificationService.to;
+  final RideNotificationService _rideNotificationService = RideNotificationService.to;
   late DriverStatusController _driverStatusController;
 
   // Map and UI state
@@ -57,9 +61,45 @@ class _HomeScreenState extends State<HomeScreen> {
         await _initializeControllers();
         await _showCurrentLocationOnMap();
         _setupLocationListener(); // Add location listener
+
+        // Request notification permission after a short delay
+        Future.delayed(const Duration(seconds: 2), () {
+          _checkNotificationPermission();
+        });
       }
     } catch (e) {
       print('❌ SAHAr Error initializing app: $e');
+    }
+  }
+
+  /// Check and request notification permission
+  Future<void> _checkNotificationPermission() async {
+    try {
+      // Don't show if already requested for both services
+      if (_notificationService.hasRequestedPermission.value &&
+          _rideNotificationService.hasRequestedPermission.value) {
+        return;
+      }
+
+      // Check chat notification permission
+      final hasChatPermission = await _notificationService.checkNotificationPermission();
+
+      // Check ride notification permission
+      final hasRidePermission = await _rideNotificationService.checkNotificationPermission();
+
+      if (!hasChatPermission || !hasRidePermission) {
+        // Show ride notification permission dialog first (more important)
+        if (!hasRidePermission) {
+          await _rideNotificationService.showPermissionRequestDialog();
+        }
+
+        // Then show chat notification permission if needed
+        if (!hasChatPermission) {
+          await _notificationService.showPermissionRequestDialog();
+        }
+      }
+    } catch (e) {
+      print('❌ SAHAr Error checking notification permission: $e');
     }
   }
 
@@ -240,8 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // Google Map
         Obx(
               () {
-            print('🗺️ SAHAr Rebuilding map with ${_mapService.markers.length} markers');
-            return GoogleMap(
+             return GoogleMap(
               mapType: MapType.normal,
               style: (isDarkMode) ? darkMapTheme : lightMapTheme,
               initialCameraPosition: _kGooglePlex,

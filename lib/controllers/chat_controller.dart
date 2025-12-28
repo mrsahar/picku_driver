@@ -2,23 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/models/message_screen_model.dart';
-import 'package:signalr_core/signalr_core.dart';
-import 'dart:async';
+import 'package:pick_u_driver/core/unified_signalr_service.dart';
+
+import '../core/chat_notification_service.dart';
 
 class ChatController extends GetxController {
-  // SignalR Connection
-  HubConnection? hubConnection;
-  Timer? _messagePollingTimer;
+  // Use Unified SignalR Service
+  final UnifiedSignalRService _signalRService = UnifiedSignalRService.to;
+  final ChatNotificationService _notificationService = ChatNotificationService.to;
 
   // Observables
-  final RxList<ChatMessage> messages = <ChatMessage>[].obs;
-  final RxBool isConnected = false.obs;
   final RxBool isLoading = false.obs;
-  final RxBool isSending = false.obs;
-  final RxBool isLoadingMessages = false.obs;
-
-  // Track recently sent messages to avoid duplicates (message text -> timestamp)
-  final Map<String, DateTime> _recentlySentMessages = {};
 
   // Message input
   final TextEditingController messageController = TextEditingController();
@@ -30,14 +24,14 @@ class ChatController extends GetxController {
   final RxString driverName = ''.obs;
   final RxString currentUserId = ''.obs;
 
-  // Hub URL - adjust according to your backend
-  final String hubUrl = "http://pickurides.com/ridechathub";
+  // Direct access to messages from UnifiedSignalRService - this is the key fix!
+  RxList<ChatMessage> get messages => _signalRService.rideChatMessages;
 
   @override
   void onInit() {
     super.onInit();
     _initializeFromArguments();
-    _initializeSignalR();
+    _initializeChat();
   }
 
   Future<void> _initializeFromArguments() async {
@@ -56,7 +50,7 @@ class ChatController extends GetxController {
       print(' SAHAr Current User ID loaded: ${currentUserId.value}');
 
       // Load chat history after user ID is loaded and connection is ready
-      if (isConnected.value) {
+      if (_signalRService.isConnected.value) {
         _loadChatHistory();
       }
     });
@@ -67,121 +61,62 @@ class ChatController extends GetxController {
     print(' SAHAr Driver Name: ${driverName.value}');
   }
 
-  Future<void> _initializeSignalR() async {
+  Future<void> _initializeChat() async {
     try {
       isLoading.value = true;
 
-      hubConnection = HubConnectionBuilder()
-          .withUrl(hubUrl)
-          .build();
+      print('🔄 SAHAr Initializing chat...');
+      print('🔄 SAHAr Using direct binding to UnifiedSignalRService messages');
 
-      // Listen for incoming messages
-      hubConnection?.on('ReceiveMessage', (List<Object?>? arguments) {
-        if (arguments != null && arguments.isNotEmpty) {
-          final messageData = arguments[0] as Map<String, dynamic>;
-          _handleReceivedMessage(messageData);
+      // Mark that user is on chat screen (no notifications while here)
+      _notificationService.setOnChatScreen(true);
+
+      // Request notification permission if not already requested
+      if (!_notificationService.hasRequestedPermission.value) {
+        final hasPermission = await _notificationService.checkNotificationPermission();
+        if (!hasPermission) {
+          // Show permission request dialog
+          await _notificationService.showPermissionRequestDialog();
         }
-      });
-
-      // Listen for chat history
-      hubConnection?.on('ReceiveRideChatHistory', (List<Object?>? arguments) {
-        print(' SAHAr ReceiveRideChatHistory event triggered');
-        if (arguments != null && arguments.isNotEmpty) {
-          final historyData = arguments[0] as List<dynamic>;
-          print(' SAHAr Chat history data received: ${historyData.length} messages');
-          _handleChatHistory(historyData);
-        }
-      });
-
-      // Handle connection events
-      hubConnection?.onclose((error) {
-        print(' SAHAr SignalR connection closed: $error');
-        isConnected.value = false;
-      });
-
-      hubConnection?.onreconnecting((error) {
-        print(' SAHAr SignalR reconnecting: $error');
-        isConnected.value = false;
-      });
-
-      hubConnection?.onreconnected((connectionId) {
-        print(' SAHAr SignalR reconnected: $connectionId');
-        isConnected.value = true;
-        _joinRideChat();
-      });
-
-      // Start connection
-      await hubConnection?.start();
-      isConnected.value = true;
-      print(' SAHAr ✅ Connected to SignalR hub');
-
-      // Join ride chat group
-      await _joinRideChat();
-
-      // Load chat history after connection is established
-      if (currentUserId.value.isNotEmpty) {
-        _loadChatHistory();
       }
 
+      // Ensure SignalR is connected
+      if (!_signalRService.isConnected.value) {
+        print('⚠️ SAHAr SignalR not connected, attempting to connect...');
+        await _signalRService.connect();
+      } else {
+        print('✅ SAHAr SignalR already connected');
+      }
+
+      // Join ride chat and load history
+      if (rideId.value.isNotEmpty) {
+        print('💬 SAHAr Joining ride chat for: ${rideId.value}');
+        await _signalRService.joinRideChat(rideId.value);
+        await _loadChatHistory();
+      } else {
+        print('⚠️ SAHAr Cannot join chat - rideId is empty');
+      }
+
+      print('✅ SAHAr Chat initialization complete. Current messages: ${messages.length}');
     } catch (e) {
-      print(' SAHAr ❌ SignalR connection error: $e');
-      Get.snackbar('Connection Error', 'Failed to connect to chat service');
+      print(' SAHAr ❌ Chat initialization error: $e');
+      print('❌ SAHAr Stack trace: ${StackTrace.current}');
+      Get.snackbar('Connection Error', 'Failed to initialize chat');
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> _joinRideChat() async {
-    if (hubConnection != null && rideId.value.isNotEmpty) {
-      try {
-        await hubConnection?.invoke('JoinRideChat', args: [rideId.value]);
-        print(' SAHAr 📌 Joined ride chat for: ${rideId.value}');
-      } catch (e) {
-        print(' SAHAr ❌ Failed to join ride chat: $e');
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (scrollController.hasClients) {
+        scrollController.animateTo(
+          scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       }
-    }
-  }
-
-  void _handleReceivedMessage(Map<String, dynamic> messageData) {
-    try {
-      print(' SAHAr Raw message data: $messageData');
-      final chatMessage = ChatMessage.fromJson(messageData);
-      final isFromCurrentUser = chatMessage.senderId == currentUserId.value;
-
-      // Check if this is a duplicate of a message we just sent
-      if (isFromCurrentUser && _recentlySentMessages.containsKey(chatMessage.message)) {
-        final sentTime = _recentlySentMessages[chatMessage.message]!;
-        final timeDifference = chatMessage.dateTime.difference(sentTime).abs();
-
-        // If the message was sent within the last 3 seconds, it's likely a duplicate
-        if (timeDifference.inSeconds < 3) {
-          print(' SAHAr Skipping duplicate message (echo from server): ${chatMessage.message}');
-          _recentlySentMessages.remove(chatMessage.message);
-          return;
-        }
-      }
-
-      final messageWithUserFlag = chatMessage.copyWith(
-        isFromCurrentUser: isFromCurrentUser,
-      );
-
-      messages.add(messageWithUserFlag);
-
-      // Scroll to bottom
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (scrollController.hasClients) {
-          scrollController.animateTo(
-            scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-
-      print(' SAHAr 📨 Received message: ${chatMessage.message}');
-    } catch (e) {
-      print(' SAHAr ❌ Error handling received message: $e');
-    }
+    });
   }
 
   Future<void> _loadChatHistory() async {
@@ -190,68 +125,11 @@ class ChatController extends GetxController {
       return;
     }
 
-    if (hubConnection == null || !isConnected.value) {
-      print(' SAHAr Cannot load chat history - not connected to SignalR');
-      return;
-    }
-
     try {
-      isLoadingMessages.value = true;
-      print(' SAHAr Loading chat history via SignalR for ride: ${rideId.value}');
-
-      // Request chat history via SignalR
-      await hubConnection?.invoke('GetRideChatHistory', args: [rideId.value]);
-      print(' SAHAr Chat history request sent successfully via SignalR');
-
+      print(' SAHAr Loading chat history via UnifiedSignalR for ride: ${rideId.value}');
+      await _signalRService.loadRideChatHistory(rideId.value);
     } catch (e) {
       print(' SAHAr Failed to request chat history: $e');
-      isLoadingMessages.value = false;
-    }
-  }
-
-  void _handleChatHistory(List<dynamic> chatHistory) {
-    try {
-      print(' SAHAr Processing chat history: ${chatHistory.length} messages');
-
-      if (chatHistory.isEmpty) {
-        print(' SAHAr No chat history found');
-        messages.clear();
-        isLoadingMessages.value = false;
-        return;
-      }
-
-      List<ChatMessage> loadedMessages = [];
-
-      for (var messageData in chatHistory) {
-        try {
-          print(' SAHAr Processing message: $messageData');
-          final chatMessage = ChatMessage.fromJson(messageData);
-          final isFromCurrentUser = chatMessage.senderId == currentUserId.value;
-
-          loadedMessages.add(chatMessage.copyWith(isFromCurrentUser: isFromCurrentUser));
-        } catch (e) {
-          print(' SAHAr Error processing individual message: $e');
-        }
-      }
-
-      messages.assignAll(loadedMessages);
-
-      // Scroll to bottom after loading
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (scrollController.hasClients) {
-          scrollController.animateTo(
-            scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-
-      print(' SAHAr Loaded ${loadedMessages.length} messages via SignalR');
-    } catch (e) {
-      print(' SAHAr Error handling chat history: $e');
-    } finally {
-      isLoadingMessages.value = false;
     }
   }
 
@@ -266,91 +144,49 @@ class ChatController extends GetxController {
       return;
     }
 
-    if (hubConnection == null || !isConnected.value) {
-      Get.snackbar('Error', 'Not connected to chat service');
-      return;
-    }
-
     try {
-      isSending.value = true;
+      print(' SAHAr Sending message via UnifiedSignalR: $messageText');
 
-      print(' SAHAr Sending message via SignalR: $messageText');
-      print(' SAHAr RideId: ${rideId.value}');
-      print(' SAHAr SenderId: ${currentUserId.value}');
-
-      // Create the message to send
-      final now = DateTime.now();
-      final newMessage = ChatMessage(
+      await _signalRService.sendRideChatMessage(
+        rideId: rideId.value,
         senderId: currentUserId.value,
         message: messageText,
-        dateTime: now,
-        isFromCurrentUser: true,
+        senderRole: 'Driver',
       );
 
-      // Add message optimistically to UI
-      messages.add(newMessage);
-
-      // Track this message to avoid adding it again when server echoes it back
-      _recentlySentMessages[messageText] = now;
-
-      // Clean up old tracked messages after 5 seconds
-      Future.delayed(const Duration(seconds: 5), () {
-        _recentlySentMessages.remove(messageText);
-      });
-
-      // Scroll to bottom
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (scrollController.hasClients) {
-          scrollController.animateTo(
-            scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-
-      // Send via SignalR
-      // Note: Server expects rideId, senderId, senderRole, message
-      await hubConnection?.invoke('SendMessage', args: [
-        rideId.value,
-        currentUserId.value,
-        'Driver', // senderRole
-        messageText,
-      ]);
-
-      print(' SAHAr Message sent successfully via SignalR');
-
-      // Clear input
       messageController.clear();
+      _scrollToBottom();
 
+      print(' SAHAr Message sent successfully');
     } catch (e) {
       print(' SAHAr Failed to send message: $e');
-
-      // Remove the optimistically added message on error
-      if (messages.isNotEmpty && messages.last.message == messageText) {
-        messages.removeLast();
-      }
-
-      Get.snackbar('Send Error', 'Failed to send message via SignalR');
-    } finally {
-      isSending.value = false;
+      Get.snackbar('Send Error', 'Failed to send message');
     }
   }
 
   void retryConnection() async {
-    if (hubConnection?.state == HubConnectionState.disconnected) {
-      await _initializeSignalR();
+    if (!_signalRService.isConnected.value) {
+      await _signalRService.connect();
+      if (rideId.value.isNotEmpty) {
+        await _signalRService.joinRideChat(rideId.value);
+        await _loadChatHistory();
+      }
     }
   }
 
   // Manual refresh method
   void refreshChatHistory() {
-    if (isConnected.value) {
+    if (_signalRService.isConnected.value) {
       _loadChatHistory();
     } else {
       Get.snackbar('Error', 'Not connected to chat service');
     }
   }
+
+  // Computed properties for UI bindings
+  RxBool get isConnected => _signalRService.isConnected;
+  RxBool get isSending => _signalRService.isRideChatSending;
+  RxBool get isLoadingMessages => _signalRService.isRideChatLoading;
 
   /// Update ride information when ChatScreen is already in stack
   void updateRideInfo({
@@ -369,18 +205,20 @@ class ChatController extends GetxController {
     this.driverName.value = driverName;
 
     // If the ride ID changed, we need to rejoin the chat room
-    if (oldRideId != rideId && hubConnection != null && isConnected.value) {
-      _joinRideChat();
+    if (oldRideId != rideId && _signalRService.isConnected.value) {
+      _signalRService.joinRideChat(rideId);
       _loadChatHistory();
     }
   }
 
   @override
   void onClose() {
+    // Mark that user left chat screen (enable notifications again)
+    _notificationService.setOnChatScreen(false);
+
     messageController.dispose();
     scrollController.dispose();
-    _messagePollingTimer?.cancel();
-    hubConnection?.stop();
+    _signalRService.clearRideChatMessages();
     super.onClose();
   }
 }
@@ -409,3 +247,4 @@ extension DateTimeExtension on DateTime {
     }
   }
 }
+

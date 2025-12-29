@@ -3,13 +3,23 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:pick_u_driver/routes/app_pages.dart';
 import 'package:pick_u_driver/utils/theme/app_theme.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'bindings/initial_binding.dart';
-import 'driver_screen/shift_time.dart';
 
 Future<void> main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
+  // Load environment variables (Stripe keys)
+  try {
+    await dotenv.load(fileName: "assets/.env");
+    print('SAHAr: ✅ Environment variables loaded successfully');
+  } catch (e) {
+    print('SAHAr: ❌ Failed to load .env file: $e');
+    print('SAHAr: Make sure assets/.env exists with STRIPE_SECRET_KEY');
+  }
+
   runApp(const MyApp());
 }
 

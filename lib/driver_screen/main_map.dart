@@ -3,10 +3,12 @@ import 'package:get/get.dart';
 import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:pick_u_driver/authentication/profile_screen.dart';
 import 'package:pick_u_driver/driver_screen/main_screen/home_screen.dart';
+import 'package:pick_u_driver/driver_screen/setup_payment_account_screen.dart';
 import 'package:pick_u_driver/utils/modern_drawer.dart';
 import 'package:pick_u_driver/utils/theme/mcolors.dart';
 
 import '../core/permission_service.dart';
+import '../core/sharePref.dart';
 
 class MainMap extends StatefulWidget {
   const MainMap({super.key});
@@ -19,20 +21,73 @@ class _MainMapState extends State<MainMap> {
   final _currentIndex = 0;
   final PermissionService _permissionService = PermissionService.to;
 
+  // Stripe account check
+  final RxBool _isCheckingStripeAccount = true.obs;
+  final RxBool _hasStripeAccount = false.obs;
+
   List<Widget> pageList = [
     const HomeScreen(),
     const ProfileScreen(),
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _checkStripeAccount();
+  }
+
+  /// Check if driver has Stripe connected account
+  Future<void> _checkStripeAccount() async {
+    try {
+      print('SAHAr: ========================================');
+      print('SAHAr: 🔍 Checking for Stripe Account');
+      print('SAHAr: ========================================');
+
+      _isCheckingStripeAccount.value = true;
+
+      String? stripeAccountId = await SharedPrefsService.getDriverStripeAccountId();
+
+      if (stripeAccountId != null && stripeAccountId.isNotEmpty) {
+        print('SAHAr: ✅ Stripe Account found: $stripeAccountId');
+        _hasStripeAccount.value = true;
+      } else {
+        print('SAHAr: ❌ No Stripe Account found');
+        _hasStripeAccount.value = false;
+      }
+    } catch (e) {
+      print('SAHAr: ❌ Error checking Stripe account: $e');
+      _hasStripeAccount.value = false;
+    } finally {
+      _isCheckingStripeAccount.value = false;
+      print('SAHAr: ========================================');
+    }
+  }
+
+  /// Public method to recheck Stripe account (called after setup completion)
+  Future<void> recheckStripeAccount() async {
+    await _checkStripeAccount();
+  }
+
+  @override
   Widget build(BuildContext context) {
     var isDark = MediaQuery.of(context).platformBrightness == Brightness.dark;
 
     return Obx(() {
+      // First check permissions
       if (!_permissionService.isReady) {
         return _buildPermissionScreen(context, isDark);
       }
 
+      // Then check Stripe account
+      if (_isCheckingStripeAccount.value) {
+        return _buildCheckingStripeScreen(context, isDark);
+      }
+
+      if (!_hasStripeAccount.value) {
+        return const SetupPaymentAccountScreen();
+      }
+
+      // All good - show main screen
       return Scaffold(
         drawer: buildModernDrawer(context, isDark),
         body: Stack(
@@ -320,5 +375,51 @@ class _MainMapState extends State<MainMap> {
     await _permissionService.ensurePermissionsWithDialog();
   }
 
-
+  /// Build checking Stripe account screen
+  Widget _buildCheckingStripeScreen(BuildContext context, bool isDark) {
+    return Scaffold(
+      backgroundColor: isDark ? Colors.grey[900] : Colors.grey[50],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDark
+                ? [Colors.grey[900]!, Colors.grey[800]!]
+                : [Colors.blue[50]!, Colors.white],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(
+                  color: MColor.primaryNavy,
+                  strokeWidth: 3,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Checking payment setup...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white : Colors.grey[800],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Please wait',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

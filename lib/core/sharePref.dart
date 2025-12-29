@@ -122,6 +122,41 @@ class SharedPrefsService {
     }
   }
 
+  // Get user first name
+  static Future<String?> getUserFirstName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final fullName = prefs.getString(_keyUserFullName);
+      if (fullName == null || fullName.isEmpty) return '';
+
+      // Split full name and return first part
+      final nameParts = fullName.split(' ');
+      return nameParts.isNotEmpty ? nameParts.first : '';
+    } catch (e) {
+      print(' SAHAr 💥 Error getting user first name: $e');
+      return null;
+    }
+  }
+
+  // Get user last name
+  static Future<String?> getUserLastName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final fullName = prefs.getString(_keyUserFullName);
+      if (fullName == null || fullName.isEmpty) return '';
+
+      // Split full name and return last part(s)
+      final nameParts = fullName.split(' ');
+      if (nameParts.length > 1) {
+        return nameParts.sublist(1).join(' ');
+      }
+      return '';
+    } catch (e) {
+      print(' SAHAr 💥 Error getting user last name: $e');
+      return null;
+    }
+  }
+
   // Get all user data
   static Future<Map<String, String?>> getUserData() async {
     try {
@@ -181,6 +216,30 @@ class SharedPrefsService {
       print(' SAHAr 💥 Error checking token expiry: $e');
       return true; // Assume expired if there's an error
     }
+  }
+
+  // Save driver's Stripe account ID
+  static Future<void> saveDriverStripeAccountId(String accountId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('driver_stripe_account_id', accountId);
+    print(' SAHAr 💾 Stripe Account ID saved: $accountId');
+  }
+
+  // Get driver's Stripe account ID
+  static Future<String?> getDriverStripeAccountId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final accountId = prefs.getString('driver_stripe_account_id');
+    if (accountId != null) {
+      print(' SAHAr 📱 Retrieved Stripe Account ID: $accountId');
+    }
+    return accountId;
+  }
+
+  // Clear driver's Stripe account ID (for testing or retry)
+  static Future<void> clearDriverStripeAccountId() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('driver_stripe_account_id');
+    print(' SAHAr 🗑️ Stripe Account ID cleared - ready for fresh onboarding');
   }
 
   // Clear all user data (for logout)

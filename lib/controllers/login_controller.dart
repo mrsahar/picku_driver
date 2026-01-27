@@ -93,9 +93,33 @@ class LoginController extends GetxController {
       print(' SAHAr 📤 Login: Sending request for email: ${emailController.text}');
       final response = await _apiProvider.login(loginRequest);
 
+      // Debug logging
+      print(' SAHAr 🔍 Login Controller: Response received');
+      print(' SAHAr 🔍 Login Controller: response.success = ${response.success}');
+      print(' SAHAr 🔍 Login Controller: response.message = ${response.message}');
+      print(' SAHAr 🔍 Login Controller: response.data = ${response.data}');
+      print(' SAHAr 🔍 Login Controller: response.data type = ${response.data.runtimeType}');
+
       if (response.success && response.data != null) {
-        final message = response.data['message'] ?? response.message;
-        final approvalStatus = response.data['approvalStatus'];
+        // Ensure response.data is a Map before accessing it
+        Map<String, dynamic>? dataMap;
+        if (response.data is Map<String, dynamic>) {
+          dataMap = response.data as Map<String, dynamic>;
+        } else {
+          print(' SAHAr ⚠️ Login Controller: response.data is not a Map, it is: ${response.data.runtimeType}');
+          Get.snackbar(
+            'Error',
+            'Invalid response format from server',
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+            snackPosition: SnackPosition.TOP,
+            duration: const Duration(seconds: 3),
+          );
+          return;
+        }
+
+        final message = dataMap['message'] ?? response.message;
+        final approvalStatus = dataMap['approvalStatus'];
 
         print(' SAHAr 📊 Login: ApprovalStatus received: $approvalStatus');
         print(' SAHAr 📝 Login: Message received: $message');
@@ -122,8 +146,9 @@ class LoginController extends GetxController {
           // DO NOT save user data for rejected/pending users
           // Only set temporary global variables for UI purposes
           final globalVars = GlobalVariables.instance;
-          globalVars.setUserEmail(response.data['email'] ?? emailController.text.trim());
-          globalVars.setUserId(response.data['userId'] ?? ''); // Add userId for rejected/pending users
+          final dataMap = response.data as Map<String, dynamic>;
+          globalVars.setUserEmail(dataMap['email'] ?? emailController.text.trim());
+          globalVars.setUserId(dataMap['userId'] ?? ''); // Add userId for rejected/pending users
 
           // Show status-specific message
           Get.snackbar(
@@ -143,13 +168,14 @@ class LoginController extends GetxController {
 
         } else {
           // ONLY save user data for approved users
-          await SharedPrefsService.saveUserDataFromResponse(response.data);
+          final dataMap = response.data as Map<String, dynamic>;
+          await SharedPrefsService.saveUserDataFromResponse(dataMap);
 
           final globalVars = GlobalVariables.instance;
-          globalVars.setUserEmail(response.data['email'] ?? emailController.text.trim());
+          globalVars.setUserEmail(dataMap['email'] ?? emailController.text.trim());
           globalVars.setLoginStatus(true);
-          globalVars.setUserToken(response.data['token']);
-          globalVars.setUserId(response.data['userId'] ?? ''); // Add userId for approved users too
+          globalVars.setUserToken(dataMap['token'] ?? '');
+          globalVars.setUserId(dataMap['userId'] ?? ''); // Add userId for approved users too
 
           // Approved user - normal login flow
           Get.snackbar(
@@ -166,9 +192,14 @@ class LoginController extends GetxController {
         }
       } else {
         // Handle API error response
+        print(' SAHAr ❌ Login Controller: Login failed');
+        print(' SAHAr ❌ Login Controller: success = ${response.success}');
+        print(' SAHAr ❌ Login Controller: data = ${response.data}');
+        print(' SAHAr ❌ Login Controller: message = ${response.message}');
+        
         Get.snackbar(
           'Error',
-          response.message,
+          response.message.isNotEmpty ? response.message : 'Login failed. Please try again.',
           backgroundColor: Colors.red,
           colorText: Colors.white,
           snackPosition: SnackPosition.TOP,

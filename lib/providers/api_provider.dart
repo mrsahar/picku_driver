@@ -644,6 +644,30 @@ class ApiProvider extends GetConnect {
     }
   }
 
+  // Logout API - POST request with JWT token
+  Future<Response> logout() async {
+    try {
+      print(' SAHAr 🚀 ApiProvider: Starting logout for: ${_globalVars.baseUrl}/api/Drivers/logout');
+      print(' SAHAr 🔐 ApiProvider: JWT token present: ${_globalVars.userToken.isNotEmpty}');
+
+      final response = await postData('/api/Drivers/logout', {});
+
+      print(' SAHAr 📋 ApiProvider: Logout response received');
+      print(' SAHAr 📊 ApiProvider: Response status code: ${response.statusCode}');
+      print(' SAHAr 📄 ApiProvider: Response body: ${response.body}');
+
+      return response;
+    } catch (e, stackTrace) {
+      print(' SAHAr 💥 ApiProvider: Logout exception: $e');
+      print(' SAHAr 📍 ApiProvider: Stack trace: $stackTrace');
+
+      return Response(
+        statusCode: 500,
+        statusText: 'Network error. Please check your connection.',
+      );
+    }
+  }
+
 
 
 }

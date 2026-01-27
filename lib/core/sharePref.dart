@@ -8,6 +8,7 @@ class SharedPrefsService {
   static const String _keyUserEmail = 'user_email';
   static const String _keyUserFullName = 'user_full_name';
   static const String _keyIsLoggedIn = 'is_logged_in';
+  static const String _keyStripeAccountId = 'driver_stripe_account_id';
 
   // Save user login data
   static Future<void> saveUserData({
@@ -56,6 +57,11 @@ class SharedPrefsService {
 
       if (data['fullName'] != null) {
         await prefs.setString(_keyUserFullName, data['fullName']);
+      }
+
+      if (data['stripeAccountId'] != null) {
+        await prefs.setString(_keyStripeAccountId, data['stripeAccountId']);
+        print(' SAHAr 💾 Stripe Account ID saved: ${data['stripeAccountId']}');
       }
 
       await prefs.setBool(_keyIsLoggedIn, true);
@@ -168,6 +174,7 @@ class SharedPrefsService {
         'userId': prefs.getString(_keyUserId),
         'email': prefs.getString(_keyUserEmail),
         'fullName': prefs.getString(_keyUserFullName),
+        'stripeAccountId': prefs.getString(_keyStripeAccountId),
         'isLoggedIn': prefs.getBool(_keyIsLoggedIn)?.toString(),
       };
     } catch (e) {
@@ -221,14 +228,14 @@ class SharedPrefsService {
   // Save driver's Stripe account ID
   static Future<void> saveDriverStripeAccountId(String accountId) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('driver_stripe_account_id', accountId);
+    await prefs.setString(_keyStripeAccountId, accountId);
     print(' SAHAr 💾 Stripe Account ID saved: $accountId');
   }
 
   // Get driver's Stripe account ID
   static Future<String?> getDriverStripeAccountId() async {
     final prefs = await SharedPreferences.getInstance();
-    final accountId = prefs.getString('driver_stripe_account_id');
+    final accountId = prefs.getString(_keyStripeAccountId);
     if (accountId != null) {
       print(' SAHAr 📱 Retrieved Stripe Account ID: $accountId');
     }
@@ -238,7 +245,7 @@ class SharedPrefsService {
   // Clear driver's Stripe account ID (for testing or retry)
   static Future<void> clearDriverStripeAccountId() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('driver_stripe_account_id');
+    await prefs.remove(_keyStripeAccountId);
     print(' SAHAr 🗑️ Stripe Account ID cleared - ready for fresh onboarding');
   }
 
@@ -252,6 +259,7 @@ class SharedPrefsService {
       await prefs.remove(_keyUserId);
       await prefs.remove(_keyUserEmail);
       await prefs.remove(_keyUserFullName);
+      await prefs.remove(_keyStripeAccountId);
       await prefs.setBool(_keyIsLoggedIn, false);
 
       print(' SAHAr 💾 User data cleared from SharedPreferences');

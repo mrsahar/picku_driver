@@ -88,7 +88,7 @@ Widget buildModernDrawer(BuildContext context, bool isDark) {
                 icon: LineAwesomeIcons.cog_solid,
                 title: 'Settings',
                 isDark: isDark,
-                onTap: () {},
+                onTap: () => Get.toNamed(AppRoutes.settingsScreen),
               ),
               _ModernMenuTile(
                 icon: LineAwesomeIcons.comment_solid,
@@ -97,6 +97,12 @@ Widget buildModernDrawer(BuildContext context, bool isDark) {
                 onTap: () {
                   Get.toNamed(AppRoutes.driveAdminChat);
                 },
+              ),
+              _ModernMenuTile(
+                icon: LineAwesomeIcons.shield_alt_solid,
+                title: 'Privacy Policy',
+                isDark: isDark,
+                onTap: () => Get.toNamed(AppRoutes.privacyPolicy),
               ),
             ],
           ),

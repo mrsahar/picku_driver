@@ -21,6 +21,8 @@ import 'package:pick_u_driver/bindings/reset_password_binding.dart';
 import 'package:pick_u_driver/bindings/ride_history_binding.dart';
 import 'package:pick_u_driver/bindings/scheduled_ride_history_binding.dart';
 import 'package:pick_u_driver/bindings/shift_application_binding.dart';
+import 'package:pick_u_driver/bindings/privacy_policy_binding.dart';
+import 'package:pick_u_driver/bindings/settings_binding.dart';
 import 'package:pick_u_driver/bindings/signup_binding.dart';
 import 'package:pick_u_driver/driver_screen/chat_screen.dart';
 import 'package:pick_u_driver/driver_screen/driver_admin_chat_screen.dart';
@@ -138,6 +140,7 @@ class AppPages {
     GetPage(
       name: AppRoutes.settingsScreen,
       page: () => const SettingsScreen(),
+      binding: SettingsBinding(),
     ),
     GetPage(
       name: AppRoutes.helpCenterScreen,
@@ -146,6 +149,7 @@ class AppPages {
     GetPage(
       name: AppRoutes.privacyPolicy,
       page: () => const PrivacyPolicyScreen(),
+      binding: PrivacyPolicyBinding(),
     ),
     GetPage(
       name: AppRoutes.chatScreen,

@@ -9,6 +9,7 @@ import 'package:pick_u_driver/core/location_service.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/core/global_variables.dart';
 import 'package:pick_u_driver/core/ride_notification_service.dart';
+import 'package:pick_u_driver/core/notification_sound_service.dart';
 import 'package:pick_u_driver/driver_screen/widget/modern_payment_dialog.dart';
 import 'package:pick_u_driver/models/ride_assignment_model.dart'; 
 import 'package:pick_u_driver/routes/app_routes.dart';
@@ -66,7 +67,7 @@ class BackgroundTrackingService extends GetxService {
   Timer? _reconnectionTimer;
 
   // Configuration
-  static const String _hubUrl = 'http://pickurides.com/ridechathub/';
+  static const String _hubUrl = 'http://api.pickurides.com/ridechathub/';
   static const String _emptyGuid = '00000000-0000-0000-0000-000000000000';
   static const double _minimumDistanceFilter = 10.0; // meters
   static const int _locationUpdateIntervalSeconds = 5;
@@ -164,7 +165,6 @@ class BackgroundTrackingService extends GetxService {
             _hubUrl,
             HttpConnectionOptions(
               accessTokenFactory: () async => jwtToken,
-              logging: (level, message) => print('SignalR: $message'),
             ),
           )
           .withAutomaticReconnect([2000, 5000, 10000, 15000, 30000])
@@ -562,6 +562,7 @@ class BackgroundTrackingService extends GetxService {
         try {
           print('🚕 SAHAr New ride assigned!');
           final rideData = arguments[0] as Map<String, dynamic>;
+          _playNotificationSound();
           _handleNewRideAssignment(rideData);
         } catch (e) {
           print('❌ SAHAr Error parsing ride: $e');
@@ -572,7 +573,7 @@ class BackgroundTrackingService extends GetxService {
     _hubConnection!.on('RideStatusUpdate', (List<Object?>? arguments) {
       if (arguments != null && arguments.isNotEmpty) {
         try {
-          final statusUpdate = arguments[0] as Map<String, dynamic>;
+          final statusUpdate = arguments[0] as Map<String, dynamic>; 
           _handleRideStatusUpdate(statusUpdate);
         } catch (e) {
           print('❌ SAHAr Error parsing status: $e');
@@ -591,6 +592,7 @@ class BackgroundTrackingService extends GetxService {
         if (currentRideId.value == completedRideId) {
           print('✅ SAHAr Ride completed: $completedRideId');
           currentRideId.value = '';
+          _playNotificationSound();
         }
       }
     });
@@ -603,7 +605,7 @@ class BackgroundTrackingService extends GetxService {
           final paymentData = arguments[0] as Map<String, dynamic>;
           String rideId = paymentData['rideId']?.toString() ?? '';
 
-          print('💰 SAHAr Payment data received: $paymentData');
+          print('💰 SAHAr Payment data received: $paymentData'); 
 
           // Update the current ride with payment info
           if (currentRide.value != null && currentRide.value!.rideId == rideId) {
@@ -692,7 +694,7 @@ class BackgroundTrackingService extends GetxService {
           bool isOnline = arguments[1] as bool;
 
           if (driverId == _driverId) {
-            print('🔄 SAHAr Driver status changed from server: ${isOnline ? "Online" : "Offline"}');
+            print('🔄 SAHAr Driver status changed from server: ${isOnline ? "Online" : "Offline"}'); 
 
             Get.snackbar(
               'Status Update',
@@ -1562,5 +1564,16 @@ class BackgroundTrackingService extends GetxService {
     });
 
     print('🧹 SAHAr All UI elements cleared');
+  }
+
+  /// Play notification sound when SignalR message is received
+  void _playNotificationSound() {
+    try {
+      if (Get.isRegistered<NotificationSoundService>()) {
+        NotificationSoundService.to.playNotificationSound();
+      }
+    } catch (e) {
+      print('⚠️ SAHAr Could not play notification sound: $e');
+    }
   }
 }

@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/core/global_variables.dart';
 import 'package:pick_u_driver/core/chat_notification_service.dart';
+import 'package:pick_u_driver/core/notification_sound_service.dart';
+import 'package:pick_u_driver/core/background_tracking_service.dart';
 import 'package:signalr_core/signalr_core.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -63,7 +65,7 @@ class UnifiedSignalRService extends GetxService {
   StreamSubscription<Position>? _positionStream;
 
   // Configuration
-  static const String _hubUrl = 'http://pickurides.com/ridechathub/';
+  static const String _hubUrl = 'http://api.pickurides.com/ridechathub/';
   static const String _emptyGuid = '00000000-0000-0000-0000-000000000000';
   static const double _minimumDistanceFilter = 10.0; // meters
 
@@ -129,7 +131,6 @@ class UnifiedSignalRService extends GetxService {
         _hubUrl,
         HttpConnectionOptions(
           accessTokenFactory: () async => jwtToken,
-          logging: (level, message) => print('SignalR: $message'),
         ),
       )
           .withAutomaticReconnect([2000, 5000, 10000, 15000, 30000])
@@ -175,70 +176,151 @@ class UnifiedSignalRService extends GetxService {
 
     // ==================== Location Tracking Events ====================
     _hubConnection!.on('RideAssigned', (List<Object?>? arguments) {
+      print('📥 SAHAr [SignalR] RideAssigned event received');
+      print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       if (arguments != null && arguments.isNotEmpty) {
         String newRideId = arguments[0].toString();
         print('🚕 SAHAr Ride assigned: $newRideId');
+        print('📥 SAHAr [SignalR] Parsed rideId: $newRideId');
         currentRideId.value = newRideId;
+        _playNotificationSound();
         _onRideAssigned(newRideId);
+      } else {
+        print('⚠️ SAHAr [SignalR] RideAssigned: arguments is null or empty');
       }
     });
 
     _hubConnection!.on('RideCompleted', (List<Object?>? arguments) {
+      print('📥 SAHAr [SignalR] RideCompleted event received');
+      print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       if (arguments != null && arguments.isNotEmpty) {
         String completedRideId = arguments[0].toString();
         print('✅ SAHAr Ride completed: $completedRideId');
+        print('📥 SAHAr [SignalR] Parsed rideId: $completedRideId');
+        print('📥 SAHAr [SignalR] Current rideId: ${currentRideId.value}');
 
         if (currentRideId.value == completedRideId) {
           currentRideId.value = '';
           _onRideCompleted(completedRideId);
+        } else {
+          print('⚠️ SAHAr [SignalR] RideCompleted: rideId mismatch (current: ${currentRideId.value}, received: $completedRideId)');
         }
+      } else {
+        print('⚠️ SAHAr [SignalR] RideCompleted: arguments is null or empty');
       }
     });
 
     _hubConnection!.on('LocationReceived', (List<Object?>? arguments) {
+      print('📥 SAHAr [SignalR] LocationReceived event received');
+      print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       print('📍 SAHAr Location update acknowledged by server');
+      // Note: Not playing sound for location acknowledgments as they're too frequent
     });
 
     _hubConnection!.on('DriverStatusChanged', (List<Object?>? arguments) {
+      print('📥 SAHAr [SignalR] DriverStatusChanged event received');
+      print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       if (arguments != null && arguments.length >= 2) {
         String driverId = arguments[0].toString();
         bool isOnline = arguments[1] as bool;
+        print('📥 SAHAr [SignalR] Parsed driverId: $driverId, isOnline: $isOnline');
+        print('📥 SAHAr [SignalR] Current driverId: $_driverId');
 
         if (driverId == _driverId) {
           print('👤 SAHAr Driver status changed from server: $isOnline');
+          _playNotificationSound();
+        } else {
+          print('⚠️ SAHAr [SignalR] DriverStatusChanged: driverId mismatch (current: $_driverId, received: $driverId)');
         }
+      } else {
+        print('⚠️ SAHAr [SignalR] DriverStatusChanged: arguments is null or insufficient (length: ${arguments?.length ?? 0})');
       }
     });
 
     // ==================== Ride Chat Events ====================
     _hubConnection!.on('ReceiveMessage', (List<Object?>? arguments) {
+      print('📥 SAHAr [SignalR] ReceiveMessage event received');
+      print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       if (arguments != null && arguments.isNotEmpty) {
-        final messageData = arguments[0] as Map<String, dynamic>;
-        _handleRideChatMessage(messageData);
+        print('📥 SAHAr [SignalR] Arguments count: ${arguments.length}');
+        print('📥 SAHAr [SignalR] First argument type: ${arguments[0].runtimeType}');
+        print('📥 SAHAr [SignalR] First argument value: ${arguments[0]}');
+        try {
+          final messageData = arguments[0] as Map<String, dynamic>;
+          print('📥 SAHAr [SignalR] Parsed messageData: $messageData');
+          print('📥 SAHAr [SignalR] MessageData keys: ${messageData.keys.toList()}');
+          _handleRideChatMessage(messageData);
+        } catch (e) {
+          print('❌ SAHAr [SignalR] Error parsing ReceiveMessage: $e');
+          print('❌ SAHAr [SignalR] Stack trace: ${StackTrace.current}');
+        }
+      } else {
+        print('⚠️ SAHAr [SignalR] ReceiveMessage: arguments is null or empty');
       }
     });
 
     _hubConnection!.on('ReceiveRideChatHistory', (List<Object?>? arguments) {
+      print('📥 SAHAr [SignalR] ReceiveRideChatHistory event received');
+      print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       print('📜 SAHAr ReceiveRideChatHistory event triggered');
       if (arguments != null && arguments.isNotEmpty) {
-        final historyData = arguments[0] as List<dynamic>;
-        print('📜 SAHAr Chat history data received: ${historyData.length} messages');
-        _handleRideChatHistory(historyData);
+        print('📥 SAHAr [SignalR] Arguments count: ${arguments.length}');
+        print('📥 SAHAr [SignalR] First argument type: ${arguments[0].runtimeType}');
+        try {
+          final historyData = arguments[0] as List<dynamic>;
+          print('📜 SAHAr Chat history data received: ${historyData.length} messages');
+          print('📥 SAHAr [SignalR] History data sample (first item): ${historyData.isNotEmpty ? historyData[0] : "empty"}');
+          // Note: Not playing sound for chat history as it's a bulk load, not a new message
+          _handleRideChatHistory(historyData);
+        } catch (e) {
+          print('❌ SAHAr [SignalR] Error parsing ReceiveRideChatHistory: $e');
+          print('❌ SAHAr [SignalR] Stack trace: ${StackTrace.current}');
+        }
+      } else {
+        print('⚠️ SAHAr [SignalR] ReceiveRideChatHistory: arguments is null or empty');
       }
     });
 
     // ==================== Driver-Admin Chat Events ====================
     _hubConnection!.on('ReceiveDriverAdminMessage', (List<Object?>? arguments) {
+      print('📥 SAHAr [SignalR] ReceiveDriverAdminMessage event received');
+      print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       if (arguments != null && arguments.isNotEmpty) {
-        final messageData = arguments[0] as Map<String, dynamic>;
-        _handleAdminChatMessage(messageData);
+        print('📥 SAHAr [SignalR] Arguments count: ${arguments.length}');
+        print('📥 SAHAr [SignalR] First argument type: ${arguments[0].runtimeType}');
+        print('📥 SAHAr [SignalR] First argument value: ${arguments[0]}');
+        try {
+          final messageData = arguments[0] as Map<String, dynamic>;
+          print('📥 SAHAr [SignalR] Parsed messageData: $messageData');
+          print('📥 SAHAr [SignalR] MessageData keys: ${messageData.keys.toList()}');
+          _handleAdminChatMessage(messageData);
+        } catch (e) {
+          print('❌ SAHAr [SignalR] Error parsing ReceiveDriverAdminMessage: $e');
+          print('❌ SAHAr [SignalR] Stack trace: ${StackTrace.current}');
+        }
+      } else {
+        print('⚠️ SAHAr [SignalR] ReceiveDriverAdminMessage: arguments is null or empty');
       }
     });
 
     _hubConnection!.on('ReceiveDriverAdminChatHistory', (List<Object?>? arguments) {
+      print('📥 SAHAr [SignalR] ReceiveDriverAdminChatHistory event received');
+      print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       if (arguments != null && arguments.isNotEmpty) {
-        final historyList = arguments[0] as List<dynamic>;
-        _handleAdminChatHistory(historyList);
+        print('📥 SAHAr [SignalR] Arguments count: ${arguments.length}');
+        print('📥 SAHAr [SignalR] First argument type: ${arguments[0].runtimeType}');
+        try {
+          final historyList = arguments[0] as List<dynamic>;
+          print('📥 SAHAr [SignalR] History list length: ${historyList.length}');
+          print('📥 SAHAr [SignalR] History data sample (first item): ${historyList.isNotEmpty ? historyList[0] : "empty"}');
+          // Note: Not playing sound for chat history as it's a bulk load, not a new message
+          _handleAdminChatHistory(historyList);
+        } catch (e) {
+          print('❌ SAHAr [SignalR] Error parsing ReceiveDriverAdminChatHistory: $e');
+          print('❌ SAHAr [SignalR] Stack trace: ${StackTrace.current}');
+        }
+      } else {
+        print('⚠️ SAHAr [SignalR] ReceiveDriverAdminChatHistory: arguments is null or empty');
       }
     });
   }
@@ -498,12 +580,15 @@ class UnifiedSignalRService extends GetxService {
     required String rideId,
     required String senderId,
     required String message,
-    required String senderRole,
+    String? senderRole,
   }) async {
     if (_hubConnection == null || !isConnected.value) {
       Get.snackbar('Error', 'Not connected to chat service');
       return;
     }
+
+    // Automatically set senderRole to "Driver" since this is the driver app
+    final role = senderRole ?? 'Driver';
 
     try {
       isRideChatSending.value = true;
@@ -512,7 +597,7 @@ class UnifiedSignalRService extends GetxService {
       final now = DateTime.now();
       final newMessage = ChatMessage(
         senderId: senderId,
-        senderRole: senderRole,
+        senderRole: role,
         message: message,
         dateTime: now,
         isFromCurrentUser: true,
@@ -521,6 +606,7 @@ class UnifiedSignalRService extends GetxService {
       rideChatMessages.add(newMessage);
       rideChatMessages.refresh(); // Force UI update
       print('📤 SAHAr Optimistically added message to UI. Total: ${rideChatMessages.length}');
+      print('📤 SAHAr Sending message with role: $role');
 
       // Track message to avoid duplicates
       _recentlySentMessages[message] = now;
@@ -533,10 +619,10 @@ class UnifiedSignalRService extends GetxService {
         rideId,
         senderId,
         message,
-        senderRole,
+        role,
       ]);
 
-      print('💬 SAHAr Ride chat message sent successfully');
+      print('💬 SAHAr Ride chat message sent successfully with role: $role');
     } catch (e) {
       print('❌ SAHAr Failed to send ride chat message: $e');
 
@@ -554,13 +640,27 @@ class UnifiedSignalRService extends GetxService {
   void _handleRideChatMessage(Map<String, dynamic> messageData) {
     try {
       print('📨 SAHAr _handleRideChatMessage called with data: $messageData');
+      print('📨 SAHAr [SignalR] MessageData keys: ${messageData.keys.toList()}');
+      print('📨 SAHAr [SignalR] MessageData values: ${messageData.values.toList()}');
+      print('📨 SAHAr [SignalR] senderId: ${messageData['senderId']}');
+      print('📨 SAHAr [SignalR] senderRole: ${messageData['senderRole']}');
+      print('📨 SAHAr [SignalR] message: ${messageData['message']}');
+      print('📨 SAHAr [SignalR] dateTime: ${messageData['dateTime']}');
+      print('📨 SAHAr [SignalR] timestamp: ${messageData['timestamp']}');
 
       final chatMessage = ChatMessage.fromJson(messageData);
       final userId = _driverId ?? '';
-      final isFromCurrentUser = chatMessage.senderId == userId;
+      
+      // Determine if message is from current user (driver) based on senderRole
+      // Driver messages should show on right, Passenger messages on left
+      final isFromCurrentUser = chatMessage.senderRole.toLowerCase() == 'driver' || 
+                                chatMessage.senderId == userId;
 
       print('📨 SAHAr Parsed message - Sender: ${chatMessage.senderId}, Message: ${chatMessage.message}');
+      print('📨 SAHAr [SignalR] Parsed senderRole: ${chatMessage.senderRole}');
+      print('📨 SAHAr [SignalR] Parsed dateTime: ${chatMessage.dateTime}');
       print('📨 SAHAr Current user ID: $userId, isFromCurrentUser: $isFromCurrentUser');
+      print('📨 SAHAr [SignalR] Message alignment: ${isFromCurrentUser ? "RIGHT (Driver)" : "LEFT (Passenger)"}');
 
       // Check for duplicates
       if (isFromCurrentUser && _recentlySentMessages.containsKey(chatMessage.message)) {
@@ -588,8 +688,30 @@ class UnifiedSignalRService extends GetxService {
         try {
           if (Get.isRegistered<ChatNotificationService>()) {
             final notificationService = Get.find<ChatNotificationService>();
+            
+            // Get passenger name from BackgroundTrackingService if available
+            String senderName = 'Passenger';
+            if (chatMessage.senderRole.toLowerCase() == 'passenger') {
+              try {
+                if (Get.isRegistered<BackgroundTrackingService>()) {
+                  final backgroundService = Get.find<BackgroundTrackingService>();
+                  if (backgroundService.currentRide.value != null) {
+                    senderName = backgroundService.currentRide.value!.passengerName;
+                  }
+                }
+              } catch (e) {
+                print('⚠️ SAHAr Could not get passenger name: $e');
+              }
+            } else if (chatMessage.senderRole.toLowerCase() == 'driver') {
+              // If message is from driver, use driver name
+              senderName = _driverName ?? 'Driver';
+            } else {
+              // For other senders, use senderId as fallback
+              senderName = chatMessage.senderId;
+            }
+            
             notificationService.showChatMessageNotification(
-              senderName: chatMessage.senderRole == 'Passenger' ? 'Passenger' : chatMessage.senderId,
+              senderName: senderName,
               message: chatMessage.message,
               rideId: currentRideId.value,
             );
@@ -607,6 +729,7 @@ class UnifiedSignalRService extends GetxService {
   void _handleRideChatHistory(List<dynamic> chatHistory) {
     try {
       print('📜 SAHAr Processing ride chat history: ${chatHistory.length} messages');
+      print('📜 SAHAr [SignalR] Chat history list type: ${chatHistory.runtimeType}');
       print('📜 SAHAr Current driver ID: $_driverId');
 
       if (chatHistory.isEmpty) {
@@ -622,13 +745,28 @@ class UnifiedSignalRService extends GetxService {
       for (var messageData in chatHistory) {
         try {
           print('📜 SAHAr Processing message data: $messageData');
-          final chatMessage = ChatMessage.fromJson(messageData);
-          final isFromCurrentUser = chatMessage.senderId == userId;
+          print('📜 SAHAr [SignalR] Message data type: ${messageData.runtimeType}');
+          if (messageData is Map) {
+            print('📜 SAHAr [SignalR] Message data keys: ${messageData.keys.toList()}');
+            print('📜 SAHAr [SignalR] senderId: ${messageData['senderId']}');
+            print('📜 SAHAr [SignalR] senderRole: ${messageData['senderRole']}');
+            print('📜 SAHAr [SignalR] message: ${messageData['message']}');
+            print('📜 SAHAr [SignalR] dateTime: ${messageData['dateTime']}');
+            print('📜 SAHAr [SignalR] timestamp: ${messageData['timestamp']}');
+          }
+          final chatMessage = ChatMessage.fromJson(messageData as Map<String, dynamic>);
+          // Determine if message is from current user (driver) based on senderRole
+          // Driver messages should show on right, Passenger messages on left
+          final isFromCurrentUser = chatMessage.senderRole.toLowerCase() == 'driver' || 
+                                    chatMessage.senderId == userId;
           loadedMessages.add(chatMessage.copyWith(isFromCurrentUser: isFromCurrentUser));
           print('📜 SAHAr Added message: ${chatMessage.message} (from current user: $isFromCurrentUser)');
+          print('📜 SAHAr [SignalR] Parsed senderRole: ${chatMessage.senderRole}');
+          print('📜 SAHAr [SignalR] Message alignment: ${isFromCurrentUser ? "RIGHT (Driver)" : "LEFT (Passenger)"}');
         } catch (e) {
           print('❌ SAHAr Error processing ride chat message: $e');
           print('❌ SAHAr Problematic message data: $messageData');
+          print('❌ SAHAr [SignalR] Stack trace: ${StackTrace.current}');
         }
       }
 
@@ -714,26 +852,35 @@ class UnifiedSignalRService extends GetxService {
 
   void _handleAdminChatMessage(Map<String, dynamic> messageData) {
     try {
+      print('📨 SAHAr [SignalR] _handleAdminChatMessage called with data: $messageData');
+      print('📨 SAHAr [SignalR] MessageData keys: ${messageData.keys.toList()}');
+      print('📨 SAHAr [SignalR] MessageData values: ${messageData.values.toList()}');
       final newMessage = ChatMessageModel.ChatMessage.fromJson(messageData);
       adminChatMessages.add(newMessage);
       print('💬 SAHAr Received admin message: ${newMessage.message}');
+      print('📨 SAHAr [SignalR] Parsed admin message - Sender: ${newMessage.senderId}, Role: ${newMessage.senderRole}, Message: ${newMessage.message}');
     } catch (e) {
       print('❌ SAHAr Error handling admin message: $e');
+      print('❌ SAHAr [SignalR] Stack trace: ${StackTrace.current}');
     }
   }
 
   void _handleAdminChatHistory(List<dynamic> historyList) {
     try {
+      print('📨 SAHAr [SignalR] _handleAdminChatHistory called with ${historyList.length} items');
       adminChatMessages.clear();
 
       for (var item in historyList) {
+        print('📨 SAHAr [SignalR] Processing admin history item: $item');
         final message = ChatMessageModel.ChatMessage.fromJson(item as Map<String, dynamic>);
         adminChatMessages.add(message);
+        print('📨 SAHAr [SignalR] Added admin message - Sender: ${message.senderId}, Role: ${message.senderRole}, Message: ${message.message}');
       }
 
       print('✅ SAHAr Loaded ${adminChatMessages.length} admin messages');
     } catch (e) {
       print('❌ SAHAr Error handling admin chat history: $e');
+      print('❌ SAHAr [SignalR] Stack trace: ${StackTrace.current}');
     } finally {
       isAdminChatLoading.value = false;
     }
@@ -745,6 +892,17 @@ class UnifiedSignalRService extends GetxService {
   }
 
   // ==================== Utility Methods ====================
+
+  /// Play notification sound when SignalR message is received
+  void _playNotificationSound() {
+    try {
+      if (Get.isRegistered<NotificationSoundService>()) {
+        NotificationSoundService.to.playNotificationSound();
+      }
+    } catch (e) {
+      print('⚠️ SAHAr Could not play notification sound: $e');
+    }
+  }
 
   /// Get current connection and tracking info for debugging
   Map<String, dynamic> getConnectionInfo() {

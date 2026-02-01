@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:pick_u_driver/core/notification_sound_service.dart';
 
 class ChatNotificationService extends GetxService {
   static ChatNotificationService get to => Get.find();
@@ -119,6 +120,15 @@ class ChatNotificationService extends GetxService {
     }
 
     try {
+      // Play notification sound
+      try {
+        if (Get.isRegistered<NotificationSoundService>()) {
+          NotificationSoundService.to.playNotificationSound();
+        }
+      } catch (e) {
+        print('⚠️ SAHAr Could not play notification sound: $e');
+      }
+
       const AndroidNotificationDetails androidPlatformChannelSpecifics =
           AndroidNotificationDetails(
         'chat_messages', // channel id
@@ -128,7 +138,8 @@ class ChatNotificationService extends GetxService {
         priority: Priority.high,
         showWhen: true,
         enableVibration: true,
-        playSound: true,
+        playSound: true, // Sound is played via NotificationSoundService, so use default system sound here
+        largeIcon: const DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // Use app icon as large icon
         styleInformation: BigTextStyleInformation(''),
       );
 

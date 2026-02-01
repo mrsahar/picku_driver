@@ -10,6 +10,7 @@ import '../core/permission_service.dart';
 import '../core/unified_signalr_service.dart';
 import '../core/chat_notification_service.dart';
 import '../core/ride_notification_service.dart';
+import '../core/notification_sound_service.dart';
 
 class InitialBinding extends Bindings {
   @override
@@ -21,6 +22,7 @@ class InitialBinding extends Bindings {
     Get.put(MapService(), permanent: true);
     Get.put(ChatNotificationService(), permanent: true);
     Get.put(RideNotificationService(), permanent: true);
+    Get.put(NotificationSoundService(), permanent: true);
     Get.put(BackgroundTrackingService(), permanent: true);
     // ActiveRideController removed - will be initialized after connection check
     // Unified SignalR service with JWT authentication

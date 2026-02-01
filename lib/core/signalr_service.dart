@@ -24,7 +24,7 @@ class SignalRService extends GetxService {
   StreamSubscription<Position>? _positionStream;
 
   // Configuration
-  static const String _hubUrl = 'http://pickurides.com/ridechathub';
+  static const String _hubUrl = 'http://api.pickurides.com/ridechathub';
   static const String _emptyGuid = '00000000-0000-0000-0000-000000000000';
   static const double _minimumDistanceFilter = 10.0; // meters
   static const int _locationUpdateIntervalSeconds = 5;

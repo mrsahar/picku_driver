@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
@@ -54,6 +55,11 @@ class PermissionService extends GetxService {
 
   /// Check and request location permissions
   Future<bool> checkLocationPermission() async {
+    // Use two-step flow for iOS, standard flow for Android
+    if (Platform.isIOS) {
+      return await requestLocationPermissionTwoStep();
+    }
+
     try {
       // Check using Geolocator
       LocationPermission geoPermission = await Geolocator.checkPermission();
@@ -99,6 +105,97 @@ class PermissionService extends GetxService {
     } catch (e) {
       print(' SAHAr PermissionService: Error checking location permission: $e');
       permissionError.value = 'Error checking permissions: $e';
+      hasLocationPermission.value = false;
+      return false;
+    }
+  }
+
+  /// Two-step location permission request for iOS
+  /// Step 1: Request "When In Use" permission first
+  /// Step 2: Request "Always" permission after user grants "When In Use"
+  Future<bool> requestLocationPermissionTwoStep() async {
+    if (!Platform.isIOS) {
+      // Android: Use existing flow
+      return await checkLocationPermission();
+    }
+
+    try {
+      // Step 1: Request "When In Use" permission first
+      LocationPermission geoPermission = await Geolocator.checkPermission();
+      
+      if (geoPermission == LocationPermission.denied) {
+        // Show custom dialog explaining why we need location
+        bool? shouldProceed = await Get.dialog<bool>(
+          AlertDialog(
+            title: const Text('Location Access Needed'),
+            content: const Text('Your location is used to show your vehicle on the map to customers and find pickup points.'),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Get.back(result: true),
+                child: const Text('Allow'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldProceed != true) return false;
+
+        geoPermission = await Geolocator.requestPermission();
+        if (geoPermission != LocationPermission.whileInUse && 
+            geoPermission != LocationPermission.always) {
+          return false;
+        }
+      }
+
+      // Step 2: Request "Always" permission if we only have "When In Use"
+      if (geoPermission == LocationPermission.whileInUse) {
+        // Show second dialog explaining why "Always" is needed
+        bool? shouldProceed = await Get.dialog<bool>(
+          AlertDialog(
+            title: const Text('Background Location Access'),
+            content: const Text('To receive rides while using navigation apps, please switch location to "Always Allow". This allows PickU to assign you nearby rides and track your trip progress accurately.'),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: const Text('Not Now'),
+              ),
+              ElevatedButton(
+                onPressed: () => Get.back(result: true),
+                child: const Text('Allow Always'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldProceed == true) {
+          // Request "Always" permission
+          var permissionStatus = await Permission.locationAlways.request();
+          if (permissionStatus.isGranted) {
+            geoPermission = await Geolocator.checkPermission();
+          }
+        }
+      }
+
+      // Check final status
+      geoPermission = await Geolocator.checkPermission();
+      hasLocationPermission.value = 
+          geoPermission == LocationPermission.always ||
+          geoPermission == LocationPermission.whileInUse;
+      
+      if (hasLocationPermission.value) {
+        print(' SAHAr PermissionService: iOS location permissions granted: $geoPermission');
+      } else {
+        permissionError.value = 'Location permission is required for driver tracking.';
+      }
+      
+      return hasLocationPermission.value;
+    } catch (e) {
+      print('❌ SAHAr PermissionService: Error in two-step permission: $e');
+      permissionError.value = 'Error requesting location permission: $e';
       hasLocationPermission.value = false;
       return false;
     }

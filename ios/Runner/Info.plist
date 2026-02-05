@@ -45,7 +45,26 @@
 		<true/>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
-		<key>UIStatusBarHidden</key>
-		<false/>
+	<key>UIStatusBarHidden</key>
+	<false/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Your location is used to show your vehicle on the map to customers and find pickup points.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This allows PickU to assign you nearby rides and track your trip progress accurately for fare calculation, even when you are navigating with another app or your screen is locked.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>This allows PickU to assign you nearby rides and track your trip progress accurately for fare calculation, even when you are navigating with another app or your screen is locked.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera access is needed to capture and upload your driver license and vehicle documents for identity verification.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Photo library access is needed to select photos for your driver documents and profile picture.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Permission to save photos to your photo library.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>remote-notification</string>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	</dict>
 </plist>

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
@@ -1313,30 +1314,58 @@ class BackgroundTrackingService extends GetxService {
     if (isLocationSending.value) return;
 
     const LocationSettings locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
+      accuracy: LocationAccuracy.bestForNavigation,
       distanceFilter: 5,
     );
 
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen(
-          (Position position) async {
-        if (_shouldSendLocationUpdate(position)) {
-          bool success = await sendLocationUpdate(position.latitude, position.longitude);
-          if (success) {
-            lastSentLocation.value = position;
+    // iOS-specific settings to keep SignalR connection alive in background
+    // Note: For iOS, we use bestForNavigation accuracy which helps prevent suspension
+    // The critical setting pauseLocationUpdatesAutomatically: false must be configured
+    // at the native iOS level through CLLocationManager delegate
+    if (Platform.isIOS) {
+      // Use bestForNavigation accuracy for iOS to optimize for vehicle navigation
+      // This helps prevent iOS from suspending the app in background
+      const LocationSettings iosLocationSettings = LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 5,
+      );
+
+      _positionStream = Geolocator.getPositionStream(
+        locationSettings: iosLocationSettings,
+      ).listen(
+        (Position position) async {
+          if (_shouldSendLocationUpdate(position)) {
+            bool success = await sendLocationUpdate(position.latitude, position.longitude);
+            if (success) {
+              lastSentLocation.value = position;
+            }
           }
-        }
-      },
-      onError: (error) => print('❌ SAHAr Position stream error: $error'),
-    );
+        },
+        onError: (error) => print('❌ SAHAr Position stream error: $error'),
+      );
+    } else {
+      // Android implementation
+      _positionStream = Geolocator.getPositionStream(
+        locationSettings: locationSettings,
+      ).listen(
+        (Position position) async {
+          if (_shouldSendLocationUpdate(position)) {
+            bool success = await sendLocationUpdate(position.latitude, position.longitude);
+            if (success) {
+              lastSentLocation.value = position;
+            }
+          }
+        },
+        onError: (error) => print('❌ SAHAr Position stream error: $error'),
+      );
+    }
 
     _locationTimer = Timer.periodic(
       const Duration(seconds: _locationUpdateIntervalSeconds),
           (timer) async {
         try {
           Position position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high,
+            desiredAccuracy: LocationAccuracy.bestForNavigation,
           );
           bool success = await sendLocationUpdate(position.latitude, position.longitude);
           if (success) lastSentLocation.value = position;
@@ -1351,7 +1380,7 @@ class BackgroundTrackingService extends GetxService {
     // Send initial location
     try {
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        desiredAccuracy: Platform.isIOS ? LocationAccuracy.bestForNavigation : LocationAccuracy.high,
       );
       bool success = await sendLocationUpdate(position.latitude, position.longitude);
       if (success) lastSentLocation.value = position;

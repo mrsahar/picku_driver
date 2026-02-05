@@ -21,8 +21,16 @@ import 'package:pick_u_driver/utils/theme/mcolors.dart';
 class BackgroundTrackingService extends GetxService {
   static BackgroundTrackingService get to => Get.find();
 
-  // Services
-  final LocationService _locationService = LocationService.to;
+  // Services - lazy loaded to avoid initialization errors
+  LocationService? get _locationService {
+    try {
+      return Get.isRegistered<LocationService>()
+          ? LocationService.to
+          : null;
+    } catch (e) {
+      return null;
+    }
+  }
 
   // Get ride notification service
   RideNotificationService? get _rideNotificationService {
@@ -1028,10 +1036,11 @@ class BackgroundTrackingService extends GetxService {
   /// Show route to pickup with custom markers
   Future<void> _showRouteToPickup(RideAssignment ride) async {
     try {
-      await _locationService.getCurrentLocation();
-      if (_locationService.currentLatLng.value == null) return;
+      if (_locationService == null) return;
+      await _locationService!.getCurrentLocation();
+      if (_locationService!.currentLatLng.value == null) return;
 
-      final origin = _locationService.currentLatLng.value!;
+      final origin = _locationService!.currentLatLng.value!;
       final pickup = LatLng(ride.pickUpLat, ride.pickUpLon);
 
       final points = await GoogleDirectionsService.getRoutePoints(
@@ -1073,10 +1082,11 @@ class BackgroundTrackingService extends GetxService {
   /// Show route to all stops with custom markers
   Future<void> _showRouteToAllStops(RideAssignment ride) async {
     try {
-      await _locationService.getCurrentLocation();
-      if (_locationService.currentLatLng.value == null) return;
+      if (_locationService == null) return;
+      await _locationService!.getCurrentLocation();
+      if (_locationService!.currentLatLng.value == null) return;
 
-      final origin = _locationService.currentLatLng.value!;
+      final origin = _locationService!.currentLatLng.value!;
       final waypoints = ride.stops
           .map((stop) => LatLng(stop.latitude, stop.longitude))
           .toList();

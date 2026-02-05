@@ -37,6 +37,7 @@ import 'package:pick_u_driver/driver_screen/screens/privacy_policy_screen.dart';
 import 'package:pick_u_driver/driver_screen/screens/setting_screen.dart';
 import 'package:pick_u_driver/driver_screen/screens/verify_message_screen.dart';
 import 'package:pick_u_driver/driver_screen/screens/welcome_screen.dart';
+import 'package:pick_u_driver/driver_screen/screens/why_need_permission_screen.dart';
 import 'package:pick_u_driver/driver_screen/shift_time.dart';
 import 'package:pick_u_driver/routes/app_route_observer.dart';
 import '../bindings/driver_feedback_binding.dart';
@@ -176,6 +177,10 @@ class AppPages {
     GetPage(
       name: AppRoutes.VERIFY_MESSAGE,
       page: () => VerifyMessageScreen.fromArguments(),
+    ),
+    GetPage(
+      name: AppRoutes.whyNeedPermission,
+      page: () => const WhyNeedPermissionScreen(),
     ),
   ];
 }

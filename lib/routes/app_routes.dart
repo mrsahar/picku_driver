@@ -38,5 +38,8 @@ abstract class AppRoutes {
   //feedback
   static const driverFeedback = '/driver-feedback';
 
+  //Permission
+  static const whyNeedPermission = '/why-need-permission';
+
 
   }

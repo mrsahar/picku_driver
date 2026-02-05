@@ -17,15 +17,12 @@ class InitialBinding extends Bindings {
   void dependencies() {
     Get.put(GlobalVariables(), permanent: true);
     Get.put(ApiProvider(), permanent: true);
-    Get.put(PermissionService(), permanent: true);
-    Get.put(LocationService(), permanent: true);
-    Get.put(MapService(), permanent: true);
+    // PermissionService removed - will be initialized after user grants permission
+    // Get.put(PermissionService(), permanent: true);
     Get.put(ChatNotificationService(), permanent: true);
     Get.put(RideNotificationService(), permanent: true);
     Get.put(NotificationSoundService(), permanent: true);
     Get.put(BackgroundTrackingService(), permanent: true);
-    // ActiveRideController removed - will be initialized after connection check
-    // Unified SignalR service with JWT authentication
     Get.put(UnifiedSignalRService(), permanent: true);
   }
 }

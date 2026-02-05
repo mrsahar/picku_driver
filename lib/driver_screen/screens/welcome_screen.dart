@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/auth_service.dart';
+import '../../core/permission_service.dart';
+import '../../core/location_service.dart';
+import '../../core/map_service.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/theme/mcolors.dart';
 
@@ -24,8 +29,85 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     final isAuthenticated = await AuthService.isAuthenticated();
 
     if (isAuthenticated && mounted) {
-      // User is logged in, redirect to main map
-      Get.offAllNamed(AppRoutes.MainMap);
+      // Check permissions before redirecting to main map
+      await _checkPermissions();
+    }
+  }
+
+  /// Check permissions and redirect accordingly
+  Future<void> _checkPermissions() async {
+    try {
+      // Check permission status
+      final geoPermission = await Geolocator.checkPermission();
+      final permissionStatus = await Permission.location.status;
+
+      // If permission is not granted, show permission screen
+      if (geoPermission == LocationPermission.denied ||
+          geoPermission == LocationPermission.deniedForever ||
+          !permissionStatus.isGranted) {
+        if (mounted) {
+          Get.offAllNamed(AppRoutes.whyNeedPermission);
+        }
+        return;
+      }
+
+      // Check GPS
+      final gpsEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!gpsEnabled) {
+        if (mounted) {
+          Get.offAllNamed(AppRoutes.whyNeedPermission);
+        }
+        return;
+      }
+
+      // All good - permissions and GPS are granted
+      // Initialize services before redirecting to main map
+      await _initializeServices();
+
+      // Redirect to main map
+      if (mounted) {
+        Get.offAllNamed(AppRoutes.MainMap);
+      }
+    } catch (e) {
+      print('Error checking permissions: $e');
+      // On error, redirect to permission screen to be safe
+      if (mounted) {
+        Get.offAllNamed(AppRoutes.whyNeedPermission);
+      }
+    }
+  }
+
+  /// Initialize PermissionService, LocationService, and MapService when permissions are already granted
+  Future<void> _initializeServices() async {
+    try {
+      // Initialize PermissionService
+      if (!Get.isRegistered<PermissionService>()) {
+        Get.put(PermissionService(), permanent: true);
+      }
+
+      // Update permission status
+      final permissionService = PermissionService.to;
+      permissionService.hasLocationPermission.value = true;
+
+      // Check GPS status
+      bool gpsEnabled = await Geolocator.isLocationServiceEnabled();
+      permissionService.isGpsEnabled.value = gpsEnabled;
+
+      // Initialize LocationService
+      if (!Get.isRegistered<LocationService>()) {
+        Get.put(LocationService(), permanent: true);
+        print('✅ LocationService initialized in WelcomeScreen');
+      }
+
+      // Initialize MapService
+      if (!Get.isRegistered<MapService>()) {
+        Get.put(MapService(), permanent: true);
+        print('✅ MapService initialized in WelcomeScreen');
+      }
+
+      print('✅ All services initialized in WelcomeScreen');
+    } catch (e) {
+      print('❌ Error initializing services in WelcomeScreen: $e');
     }
   }
 

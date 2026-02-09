@@ -4,6 +4,8 @@ import 'package:line_awesome_flutter/line_awesome_flutter.dart';
 import 'package:pick_u_driver/controllers/edit_profile_controller.dart';
 import 'package:pick_u_driver/utils/picku_appbar.dart';
 
+import '../routes/app_routes.dart';
+
 // Section header widget for grouping form fields
 class _SectionHeader extends StatelessWidget {
   final String title;
@@ -140,155 +142,34 @@ class EditProfileScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 30),
 
-                    // License & Documentation Section
-                    _SectionHeader(title: "License & Documentation"),
+                    _SectionHeader(title: "Driver Details"),
 
-                    TextFormField(
-                      controller: controller.txtLicenseNumber,
-                      keyboardType: TextInputType.text,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(LineAwesomeIcons.id_card_solid),
-                        labelText: "Enter License Number",
-                        hintText: "Driver License Number",
-                        border: OutlineInputBorder(),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Get.toNamed(
+                            AppRoutes.driverLicenseDocs,
+                            arguments: controller.user.value,
+                          );
+                        },
+                        icon: const Icon(LineAwesomeIcons.id_card_solid),
+                        label: const Text('Edit License & Documentation'),
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter license number';
-                        }
-                        return null;
-                      },
                     ),
-                    const SizedBox(height: 20),
-
-                    TextFormField(
-                      controller: controller.txtSin,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(LineAwesomeIcons.shield_alt_solid),
-                        labelText: "Social Insurance Number",
-                        hintText: "SIN",
-                        border: OutlineInputBorder(),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Get.toNamed(
+                            AppRoutes.vehicleInformation,
+                            arguments: controller.user.value,
+                          );
+                        },
+                        icon: const Icon(LineAwesomeIcons.car_solid),
+                        label: const Text('Edit Vehicle Information'),
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter SIN';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 30),
-
-                    // Vehicle Information Section
-                    _SectionHeader(title: "Vehicle Information"),
-
-                    TextFormField(
-                      controller: controller.txtVehicleName,
-                      keyboardType: TextInputType.text,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(LineAwesomeIcons.car_solid),
-                        labelText: "Vehicle Name/Model",
-                        hintText: "e.g., Toyota Camry 2020",
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter vehicle name';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    TextFormField(
-                      controller: controller.txtVehicleColor,
-                      keyboardType: TextInputType.text,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(LineAwesomeIcons.palette_solid),
-                        labelText: "Vehicle Color",
-                        hintText: "e.g., Black, White, Red",
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter vehicle color';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    TextFormField(
-                      controller: controller.txtCarLicensePlate,
-                      keyboardType: TextInputType.text,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(LineAwesomeIcons.car_solid),
-                        labelText: "Car License Plate",
-                        hintText: "e.g., ABC-1234",
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter license plate';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    TextFormField(
-                      controller: controller.txtCarVin,
-                      keyboardType: TextInputType.text,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(LineAwesomeIcons.car_solid),
-                        labelText: "Vehicle Identification Number",
-                        hintText: "VIN",
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter VIN';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    TextFormField(
-                      controller: controller.txtCarRegistration,
-                      keyboardType: TextInputType.text,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(LineAwesomeIcons.file_solid),
-                        labelText: "Car Registration Number",
-                        hintText: "Registration Number",
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter registration number';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    TextFormField(
-                      controller: controller.txtCarInsurance,
-                      keyboardType: TextInputType.text,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(LineAwesomeIcons.file_contract_solid),
-                        labelText: "Car Insurance Number",
-                        hintText: "Insurance Policy Number",
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter insurance number';
-                        }
-                        return null;
-                      },
                     ),
                     const SizedBox(height: 30),
 

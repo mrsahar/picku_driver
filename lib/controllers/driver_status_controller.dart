@@ -81,6 +81,11 @@ class DriverStatusController extends GetxController {
   /// Set driver online - Start background service
   Future<void> _goOnline() async {
     try {
+      final hasStripe = await _ensureStripeConnected();
+      if (!hasStripe) {
+        return;
+      }
+
       print('🔄 SAHAr Attempting to go online...');
       print('🔄 SAHAr Driver ID: $_driverId');
       print('🔄 SAHAr Driver Name: $_driverName');
@@ -159,6 +164,83 @@ class DriverStatusController extends GetxController {
     }
   }
 
+  /// Ensure Stripe account is connected before going online
+  Future<bool> _ensureStripeConnected() async {
+    try {
+      final stripeAccountId = await SharedPrefsService.getDriverStripeAccountId();
+      final hasStripe = stripeAccountId != null && stripeAccountId.isNotEmpty;
+      if (!hasStripe) {
+        _showStripeRequiredSheet();
+      }
+      return hasStripe;
+    } catch (e) {
+      print('❌ SAHAr Error checking Stripe account: $e');
+      _showStripeRequiredSheet();
+      return false;
+    }
+  }
+
+  void _showStripeRequiredSheet() {
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+                SizedBox(width: 12),
+                Text(
+                  'Stripe account required',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Your Stripe account is not connected. Please add and connect your Stripe account, otherwise you cannot go live.',
+              style: TextStyle(fontSize: 14, color: Colors.black54),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Get.back(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: MColor.primaryNavy,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      isScrollControlled: true,
+    );
+  }
+
   /// Show error message
   void _showError(String message) {
     Get.snackbar(
@@ -222,7 +304,7 @@ class DriverStatusToggle extends StatelessWidget {
         subText = 'Please wait';
       } else if (connectionStatus == 'Connecting...' || connectionStatus == 'Reconnecting...') {
         // Connecting
-        statusColor = Colors.orange;
+        statusColor = Colors.purple;
         statusText = 'CONNECTING';
         subText = connectionStatus;
       } else if (isConnected && isSubscribed) {
@@ -232,7 +314,7 @@ class DriverStatusToggle extends StatelessWidget {
         subText = 'Long press for details';
       } else if (isConnected && !isSubscribed) {
         // Connected but not subscribed
-        statusColor = Colors.orange;
+        statusColor = Colors.blue;
         statusText = 'ONLINE';
         subText = 'Not subscribed';
       } else {
@@ -558,3 +640,4 @@ class DriverStatusToggle extends StatelessWidget {
     );
   }
 }
+

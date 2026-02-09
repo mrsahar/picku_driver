@@ -2,11 +2,13 @@ import 'package:get/get.dart';
 import 'package:pick_u_driver/authentication/driver_profile_page.dart';
 import 'package:pick_u_driver/authentication/edit_profile_screen.dart';
 import 'package:pick_u_driver/authentication/forget_password_screen.dart';
+import 'package:pick_u_driver/authentication/license_documentation_screen.dart';
 import 'package:pick_u_driver/authentication/login_screen.dart';
 import 'package:pick_u_driver/authentication/otp_screen.dart';
 import 'package:pick_u_driver/authentication/profile_screen.dart';
 import 'package:pick_u_driver/authentication/reset_password_screen.dart';
 import 'package:pick_u_driver/authentication/signup_screen.dart';
+import 'package:pick_u_driver/authentication/vehicle_information_screen.dart';
 import 'package:pick_u_driver/bindings/chat_binding.dart';
 import 'package:pick_u_driver/bindings/driver_admin_chat_binding.dart';
 import 'package:pick_u_driver/bindings/driver_documents_binding.dart';
@@ -80,6 +82,16 @@ class AppPages {
     GetPage(
       name: AppRoutes.editProfile,
       page: () => const EditProfileScreen(),
+      binding: EditProfileBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.driverLicenseDocs,
+      page: () => const LicenseDocumentationScreen(),
+      binding: EditProfileBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.vehicleInformation,
+      page: () => const VehicleInformationScreen(),
       binding: EditProfileBinding(),
     ),
     GetPage(

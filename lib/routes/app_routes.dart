@@ -21,6 +21,8 @@ abstract class AppRoutes {
   static const scheduledRideHistory = '/scheduledRideHistory';
   static const String profileScreen = '/profileScreen';
   static const editProfile = '/editProfile';
+  static const driverLicenseDocs = '/driver-license-docs';
+  static const vehicleInformation = '/vehicle-information';
   static const String chatScreen = '/chatScreen';
 
   //Extra

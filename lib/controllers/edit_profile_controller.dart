@@ -10,7 +10,6 @@ import 'package:pick_u_driver/providers/api_provider.dart';
 import 'package:pick_u_driver/utils/theme/mcolors.dart';
 
 class EditProfileController extends GetxController {
-
   final ApiProvider _apiProvider = Get.find<ApiProvider>();
   // Form controllers
   final TextEditingController txtUserName = TextEditingController();
@@ -25,8 +24,10 @@ class EditProfileController extends GetxController {
   final TextEditingController txtVehicleName = TextEditingController();
   final TextEditingController txtVehicleColor = TextEditingController();
 
-  // Form key for validation
+  // Form keys for validation
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> licenseFormKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> vehicleFormKey = GlobalKey<FormState>();
 
   // Observable variables
   var selectedImagePath = ''.obs;
@@ -235,11 +236,57 @@ class EditProfileController extends GetxController {
     return true;
   }
 
-  // Update user profile
+  // Update user profile (personal info)
   Future<void> updateProfile() async {
     try {
       if (!validateForm()) return;
+      await _submitProfileUpdate();
+    } catch (e) {
+      print(' SAHAr ❌ Error updating profile: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to update profile: $e',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
 
+  Future<void> updateLicenseDocumentation() async {
+    try {
+      if (!(licenseFormKey.currentState?.validate() ?? false)) return;
+      await _submitProfileUpdate();
+    } catch (e) {
+      print(' SAHAr ❌ Error updating license info: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to update license info: $e',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  Future<void> updateVehicleInformation() async {
+    try {
+      if (!(vehicleFormKey.currentState?.validate() ?? false)) return;
+      await _submitProfileUpdate();
+    } catch (e) {
+      print(' SAHAr ❌ Error updating vehicle info: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to update vehicle info: $e',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  Future<void> _submitProfileUpdate() async {
+    try {
       isLoading.value = true;
       final userId = user.value?.userId ?? '';
       final imagePath = selectedImagePath.value;
@@ -308,21 +355,11 @@ class EditProfileController extends GetxController {
         throw Exception(response.statusText ?? 'Failed to update profile');
       }
     } catch (e) {
-      print(' SAHAr ❌ Error updating profile: $e');
-      Get.snackbar(
-        'Error',
-        'Failed to update profile: $e',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      rethrow;
     } finally {
       isLoading.value = false;
     }
   }
-
-
-
 
   // Delete account
   Future<void> deleteAccount() async {
@@ -382,3 +419,4 @@ class EditProfileController extends GetxController {
     }
   }
 }
+

@@ -5,12 +5,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:pick_u_driver/authentication/profile_screen.dart';
 import 'package:pick_u_driver/driver_screen/main_screen/home_screen.dart';
-import 'package:pick_u_driver/driver_screen/setup_payment_account_screen.dart';
 import 'package:pick_u_driver/utils/modern_drawer.dart';
-import 'package:pick_u_driver/utils/theme/mcolors.dart';
 
 import '../core/permission_service.dart';
-import '../core/sharePref.dart';
 import '../routes/app_routes.dart';
 
 class MainMap extends StatefulWidget {
@@ -23,10 +20,6 @@ class MainMap extends StatefulWidget {
 class _MainMapState extends State<MainMap> {
   final _currentIndex = 0;
   PermissionService? _permissionService;
-
-  // Stripe account check
-  final RxBool _isCheckingStripeAccount = true.obs;
-  final RxBool _hasStripeAccount = false.obs;
 
   List<Widget> pageList = [
     const HomeScreen(),
@@ -49,7 +42,7 @@ class _MainMapState extends State<MainMap> {
     }
 
     _permissionService = PermissionService.to;
-    
+
     // Check if permissions are ready
     if (!_permissionService!.isReady) {
       // Redirect to permission screen
@@ -58,9 +51,6 @@ class _MainMapState extends State<MainMap> {
       }
       return;
     }
-
-    // Permissions are ready, check Stripe account
-    _checkStripeAccount();
   }
 
   /// Check permission status without initializing PermissionService
@@ -91,45 +81,12 @@ class _MainMapState extends State<MainMap> {
 
       // All good, initialize PermissionService and proceed
       _permissionService = Get.put(PermissionService(), permanent: true);
-      _checkStripeAccount();
     } catch (e) {
       print('Error checking permission status: $e');
       if (mounted) {
         Get.offAllNamed(AppRoutes.whyNeedPermission);
       }
     }
-  }
-
-  /// Check if driver has Stripe connected account
-  Future<void> _checkStripeAccount() async {
-    try {
-      print('SAHAr: ========================================');
-      print('SAHAr: 🔍 Checking for Stripe Account');
-      print('SAHAr: ========================================');
-
-      _isCheckingStripeAccount.value = true;
-
-      String? stripeAccountId = await SharedPrefsService.getDriverStripeAccountId();
-
-      if (stripeAccountId != null && stripeAccountId.isNotEmpty) {
-        print('SAHAr: ✅ Stripe Account found: $stripeAccountId');
-        _hasStripeAccount.value = true;
-      } else {
-        print('SAHAr: ❌ No Stripe Account found');
-        _hasStripeAccount.value = false;
-      }
-    } catch (e) {
-      print('SAHAr: ❌ Error checking Stripe account: $e');
-      _hasStripeAccount.value = false;
-    } finally {
-      _isCheckingStripeAccount.value = false;
-      print('SAHAr: ========================================');
-    }
-  }
-
-  /// Public method to recheck Stripe account (called after setup completion)
-  Future<void> recheckStripeAccount() async {
-    await _checkStripeAccount();
   }
 
   @override
@@ -159,15 +116,6 @@ class _MainMapState extends State<MainMap> {
             child: CircularProgressIndicator(),
           ),
         );
-      }
-
-      // Then check Stripe account
-      if (_isCheckingStripeAccount.value) {
-        return _buildCheckingStripeScreen(context, isDark);
-      }
-
-      if (!_hasStripeAccount.value) {
-        return const SetupPaymentAccountScreen();
       }
 
       // All good - show main screen
@@ -237,53 +185,6 @@ class _MainMapState extends State<MainMap> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-  /// Build checking Stripe account screen
-  Widget _buildCheckingStripeScreen(BuildContext context, bool isDark) {
-    return Scaffold(
-      backgroundColor: isDark ? Colors.grey[900] : Colors.grey[50],
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: isDark
-                ? [Colors.grey[900]!, Colors.grey[800]!]
-                : [Colors.blue[50]!, Colors.white],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(
-                  color: MColor.primaryNavy,
-                  strokeWidth: 3,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Checking payment setup...',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: isDark ? Colors.white : Colors.grey[800],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Please wait',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? Colors.grey[400] : Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );

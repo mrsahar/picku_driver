@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:pick_u_driver/controllers/ride_controller.dart';
 import 'package:pick_u_driver/core/background_tracking_service.dart';
 import 'package:pick_u_driver/controllers/driver_status_controller.dart';
@@ -38,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Map and UI state
   static const CameraPosition _kGooglePlex = CameraPosition(
     target: LatLng(31.8329711, 70.9028416),
-    zoom: 16,
+    zoom: 17,
   );
 
   // Track if user moved away from their location
@@ -48,10 +49,20 @@ class _HomeScreenState extends State<HomeScreen> {
   // Track if initial location has been set
   bool _hasInitialLocationBeenSet = false;
 
+  // Location stream subscription for continuous updates
+  StreamSubscription<Position>? _locationStreamSubscription;
+
   @override
   void initState() {
     super.initState();
     _initializeApp();
+  }
+
+  @override
+  void dispose() {
+    _locationStreamSubscription?.cancel();
+    _driverStatusController.dispose();
+    super.dispose();
   }
 
   /// Initialize app
@@ -115,6 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Show current location on map
+  /// Show current location on map
   Future<void> _showCurrentLocationOnMap() async {
     try {
       await _locationService.getCurrentLocation();
@@ -123,20 +135,21 @@ class _HomeScreenState extends State<HomeScreen> {
         LatLng currentLocation = _locationService.currentLatLng.value!;
         _userLocation = currentLocation;
 
-        _mapService.updateUserLocationMarker(
+        // FIXED: New method name, removed 'title'
+        _mapService.updateDriverMarker(
           currentLocation.latitude,
           currentLocation.longitude,
-          title: 'My Location',
         );
 
         // Center map on first location
         if (!_hasInitialLocationBeenSet) {
+          // Ab ye chalega kyunki humne animateToLocation wapis daal diya hai
           await _centerMapToLocation(currentLocation, zoom: 17.0);
           _hasInitialLocationBeenSet = true;
           print('✅ SAHAr First location set and map centered');
         }
 
-        setState(() {});
+        if (mounted) setState(() {});
       }
     } catch (e) {
       print('❌ SAHAr Error showing current location: $e');
@@ -145,17 +158,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Setup location listener for continuous updates
   void _setupLocationListener() {
-    // Listen to location changes
-    ever(_locationService.currentLatLng, (LatLng? newLocation) {
-      if (newLocation != null) {
-        print('📍 SAHAr Location updated: $newLocation');
+    // Start continuous location stream
+    _locationStreamSubscription = _locationService.getLocationStream().listen(
+      (Position position) {
+        final newLocation = LatLng(position.latitude, position.longitude);
+        print('📍 HomeScreen: Location stream update: $newLocation');
 
-        // Update user location marker with smooth animation
-        _mapService.updateUserLocationMarker(
-          newLocation.latitude,
-          newLocation.longitude,
-          title: 'My Location',
-          centerMap: false, // Don't auto-center after first time
+        // Update marker via MapService
+        _mapService.updateDriverMarker(
+          position.latitude,
+          position.longitude,
         );
 
         // Update stored location
@@ -165,34 +177,56 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!_hasInitialLocationBeenSet) {
           _centerMapToLocation(newLocation, zoom: 17.0);
           _hasInitialLocationBeenSet = true;
-          print('✅ SAHAr First location set via listener');
+          print('✅ HomeScreen: First location set via stream');
+        }
+      },
+      onError: (error) {
+        print('❌ HomeScreen: Location stream error: $error');
+      },
+    );
+
+    // Also listen to GetX observable for backwards compatibility
+    ever(_locationService.currentLatLng, (LatLng? newLocation) {
+      if (newLocation != null) {
+        print('📍 SAHAr Location updated via GetX: $newLocation');
+
+        _mapService.updateDriverMarker(
+          newLocation.latitude,
+          newLocation.longitude,
+        );
+
+        _userLocation = newLocation;
+
+        if (!_hasInitialLocationBeenSet) {
+          _centerMapToLocation(newLocation, zoom: 17.0);
+          _hasInitialLocationBeenSet = true;
+          print('✅ SAHAr First location set via GetX listener');
         }
       }
     });
 
-    // Check if location is already available (in case listener misses initial update)
+    // Check if location is already available
     if (_locationService.currentLatLng.value != null && !_hasInitialLocationBeenSet) {
       LatLng currentLocation = _locationService.currentLatLng.value!;
-      print('📍 SAHAr Location already available: $currentLocation');
 
-      _mapService.updateUserLocationMarker(
+      _mapService.updateDriverMarker(
         currentLocation.latitude,
         currentLocation.longitude,
-        title: 'My Location',
       );
 
       _userLocation = currentLocation;
       _centerMapToLocation(currentLocation, zoom: 17.0);
       _hasInitialLocationBeenSet = true;
-      print('✅ SAHAr Initial location already available and set');
     }
   }
 
   /// Center map to specific location
-  Future<void> _centerMapToLocation(LatLng location, {double zoom = 16.0}) async {
+  Future<void> _centerMapToLocation(LatLng location, {double zoom = 17.0}) async {
+    // Ye ab error nahi dega
     await _mapService.animateToLocation(location, zoom: zoom);
     print('🎯 SAHAr Map centered to: $location with zoom: $zoom');
   }
+
 
   /// Check if camera moved away from user location
   void _onCameraMove(CameraPosition position) {
@@ -250,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
         CameraUpdate.newCameraPosition(
           CameraPosition(
             target: _userLocation!,
-            zoom: 16.5,
+            zoom: 17.0,
           ),
         ),
       );
@@ -277,29 +311,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Stack(
       children: [
-        // Google Map
+        // Google Map - Wrapped in RepaintBoundary to reduce rebuilds
         Obx(
               () {
-             return GoogleMap(
-              mapType: MapType.normal,
-              style: (isDarkMode) ? darkMapTheme : lightMapTheme,
-              initialCameraPosition: _kGooglePlex,
-              myLocationButtonEnabled: false,
-              myLocationEnabled: false,
-              zoomControlsEnabled: false,
-              markers: {
-                ..._mapService.markers.toSet(),
-                ..._backgroundService.rideMarkers,
-              },
-              polylines: {
-                ..._backgroundService.routePolylines,
-              },
-              onMapCreated: (GoogleMapController controller) {
-                _mapService.setMapController(controller);
-                print('✅ SAHAr Map controller set');
-              },
-              onCameraMove: _onCameraMove,
-            );
+            // Force reactivity by accessing the observable values
+            final mapServiceMarkers = _mapService.markers.toSet();
+            final rideMarkers = _backgroundService.rideMarkers.toSet();
+            // ✅ Use MapService.polylines as Single Source of Truth
+            final routePolylines = _mapService.polylines.toSet();
+
+            // ✅ Reduced logging - only log occasionally to reduce spam
+            if (DateTime.now().millisecond % 50 == 0) {
+              print('🗺️ HomeScreen: Rebuilding map - MapService markers: ${mapServiceMarkers.length}, Ride markers: ${rideMarkers.length}, Polylines: ${routePolylines.length}');
+            }
+
+             return RepaintBoundary(
+               child: GoogleMap(
+                 mapType: MapType.normal,
+                 style: (isDarkMode) ? darkMapTheme : lightMapTheme,
+                 initialCameraPosition: _kGooglePlex,
+                 myLocationButtonEnabled: false,
+                 myLocationEnabled: false,
+                 zoomControlsEnabled: false,
+                 markers: {
+                   ...mapServiceMarkers,
+                   ...rideMarkers,
+                 },
+                 polylines: routePolylines,
+                 onMapCreated: (GoogleMapController controller) {
+                   _mapService.setMapController(controller);
+                   print('✅ SAHAr Map controller set');
+                 },
+                 onCameraMove: _onCameraMove,
+               ),
+             );
           },
         ),
 
@@ -397,11 +442,5 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     );
-  }
-
-  @override
-  void dispose() {
-    _driverStatusController.dispose();
-    super.dispose();
   }
 }

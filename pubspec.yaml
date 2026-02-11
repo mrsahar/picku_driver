@@ -52,6 +52,8 @@ dependencies:
   intl: ^0.20.2
   image_picker: ^1.2.0
   image: ^4.5.4
+  sqflite: ^2.3.0
+  path: ^1.8.3
   signalr_core: ^1.1.2
   url_launcher: ^6.3.2
   flutter_launcher_icons: ^0.14.4
@@ -62,6 +64,8 @@ dependencies:
   webview_flutter: ^4.13.0
   package_info_plus: ^9.0.0
   audioplayers: ^6.1.0
+  wakelock_plus: ^1.2.1
+  connectivity_plus: ^6.1.1
 
 dev_dependencies:
   flutter_test:

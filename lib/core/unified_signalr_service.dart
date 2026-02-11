@@ -1,13 +1,16 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+
 import 'package:get/get.dart';
-import 'package:pick_u_driver/core/sharePref.dart';
+import 'package:pick_u_driver/core/driver_service.dart';
+import 'package:pick_u_driver/core/location_service.dart';
 import 'package:pick_u_driver/core/global_variables.dart';
 import 'package:pick_u_driver/core/chat_notification_service.dart';
 import 'package:pick_u_driver/core/notification_sound_service.dart';
 import 'package:pick_u_driver/core/background_tracking_service.dart';
+import 'package:pick_u_driver/core/internet_connectivity_service.dart';
+import 'package:pick_u_driver/core/database_helper.dart';
 import 'package:signalr_core/signalr_core.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:geolocator/geolocator.dart'; // Remove usage, keep type if needed or use LocationService types
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:pick_u_driver/models/ride_assignment_model.dart';
 import 'package:pick_u_driver/models/chat_message_model.dart' as ChatMessageModel;
@@ -57,12 +60,11 @@ class UnifiedSignalRService extends GetxService {
   var rideMarkers = <Marker>{}.obs;
 
   // Driver information
-  String? _driverId;
-  String? _driverName;
+  // Use getters via DriverService if possible, or local cache updated from it.
 
   // Timers and streams
-  Timer? _locationTimer;
-  StreamSubscription<Position>? _positionStream;
+  StreamSubscription<Position?>? _locationServiceSubscription;
+  StreamSubscription<bool>? _connectivitySubscription;
 
   // Configuration
   static const String _hubUrl = 'https://api.pickurides.com/ridechathub/';
@@ -71,46 +73,102 @@ class UnifiedSignalRService extends GetxService {
 
   // Track recently sent messages to avoid duplicates
   final Map<String, DateTime> _recentlySentMessages = {};
+  
+  // Track last connectivity state to detect changes
+  bool _wasConnectedToInternet = true;
 
   @override
   void onInit() {
     super.onInit();
-    _loadDriverInfo();
+    // Driver info is managed by DriverService, but we might want to ensure it's loaded?
+    // DriverService.to.onInit() is called automatically.
     _initializeConnection();
+    _setupConnectivityListener();
+    // We can listen to DriverService changes if needed, but usually it's static during session.
   }
 
-  /// Load driver information from SharedPreferences
-  Future<void> _loadDriverInfo() async {
+  /// Setup listener for internet connectivity changes
+  void _setupConnectivityListener() {
     try {
-      _driverId = await SharedPrefsService.getUserId();
-      _driverName = await SharedPrefsService.getUserFullName();
-
-      // Ensure we have valid driver info
-      if (_driverId == null || _driverId!.isEmpty) {
-        print('❌ SAHAr Driver ID is null or empty, retrying...');
-        await Future.delayed(const Duration(seconds: 2));
-        _driverId = await SharedPrefsService.getUserId();
+      if (!Get.isRegistered<InternetConnectivityService>()) {
+        print('⚠️ SAHAr InternetConnectivityService not registered yet');
+        return;
       }
 
-      if (_driverName == null || _driverName!.isEmpty) {
-        print('❌ SAHAr Driver name is null or empty, retrying...');
-        await Future.delayed(const Duration(seconds: 2));
-        _driverName = await SharedPrefsService.getUserFullName();
-      }
+      final connectivityService = InternetConnectivityService.to;
+      
+      // Listen to connectivity changes
+      _connectivitySubscription = connectivityService.isConnected.listen((isConnected) {
+        print('🌐 SAHAr Internet connectivity changed: $isConnected');
+        _handleConnectivityChange(isConnected);
+      });
 
-      print('🚗 SAHAr Driver info loaded: $_driverName ($_driverId)');
+      print('✅ SAHAr Connectivity listener setup complete');
     } catch (e) {
-      print('❌ SAHAr Error loading driver info: $e');
-      Timer(const Duration(seconds: 5), () => _loadDriverInfo());
+      print('❌ SAHAr Error setting up connectivity listener: $e');
     }
   }
 
-  /// Set driver information manually
-  void setDriverInfo(String driverId, String driverName) {
-    _driverId = driverId;
-    _driverName = driverName;
-    print('🚗 SAHAr Driver info set: $driverName ($driverId)');
+  /// Handle internet connectivity changes
+  void _handleConnectivityChange(bool isConnectedToInternet) {
+    // Internet connection restored
+    if (isConnectedToInternet && !_wasConnectedToInternet) {
+      print('🟢 SAHAr Internet restored, attempting SignalR reconnection...');
+      _attemptReconnection();
+    } 
+    // Internet connection lost
+    else if (!isConnectedToInternet && _wasConnectedToInternet) {
+      print('🔴 SAHAr Internet lost, SignalR will attempt automatic reconnection');
+      // SignalR has automatic reconnect, but we pause location updates
+      if (isLocationSending.value) {
+        _pauseLocationUpdates();
+      }
+    }
+
+    _wasConnectedToInternet = isConnectedToInternet;
   }
+
+  /// Attempt to reconnect SignalR after internet restoration
+  Future<void> _attemptReconnection() async {
+    try {
+      // If already connected, no need to reconnect
+      if (isConnected.value) {
+        print('✅ SAHAr SignalR already connected');
+        // Resume location updates if needed
+        if (isLocationSending.value) {
+          _resumeLocationUpdates();
+        }
+        return;
+      }
+
+      // Try to connect
+      print('🔄 SAHAr Attempting SignalR reconnection...');
+      bool success = await connect();
+
+      if (success) {
+        print('✅ SAHAr SignalR reconnected successfully');
+        
+        // Resume location updates if they were active
+        if (isLocationSending.value) {
+          _resumeLocationUpdates();
+        }
+      } else {
+        print('❌ SAHAr SignalR reconnection failed, will retry...');
+        // Schedule retry after 3 seconds
+        Future.delayed(const Duration(seconds: 3), () {
+          if (!isConnected.value && _wasConnectedToInternet) {
+            _attemptReconnection();
+          }
+        });
+      }
+    } catch (e) {
+      print('❌ SAHAr Error during reconnection attempt: $e');
+    }
+  }
+
+  /// Get driver info from DriverService
+  String? get _driverId => DriverService.to.driverId.value;
+  String? get _driverName => DriverService.to.driverName.value;
 
   /// Initialize SignalR connection with JWT authentication
   Future<void> _initializeConnection() async {
@@ -172,6 +230,17 @@ class UnifiedSignalRService extends GetxService {
       if (isLocationSending.value) {
         _resumeLocationUpdates();
       }
+
+       // Rejoin active ride chat group after reconnection so messages & history resume.
+       try {
+         if (currentRideId.value.isNotEmpty) {
+           print('💬 SAHAr Rejoining ride chat after reconnection for rideId: ${currentRideId.value}');
+           joinRideChat(currentRideId.value);
+           loadRideChatHistory(currentRideId.value);
+         }
+       } catch (e) {
+         print('⚠️ SAHAr Error rejoining ride chat after reconnection: $e');
+       }
     });
 
     // ==================== Location Tracking Events ====================
@@ -235,6 +304,24 @@ class UnifiedSignalRService extends GetxService {
       } else {
         print('⚠️ SAHAr [SignalR] DriverStatusChanged: arguments is null or insufficient (length: ${arguments?.length ?? 0})');
       }
+    });
+
+    _hubConnection!.on('RideStatusUpdate', (List<Object?>? arguments) {
+       print('📥 SAHAr [SignalR] RideStatusUpdate event received');
+       if (arguments != null && arguments.isNotEmpty) {
+         try {
+           final statusUpdate = arguments[0] as Map<String, dynamic>;
+           // Update reactive variables
+           // Assuming statusUpdate has 'status' and 'rideId'
+           if (statusUpdate.containsKey('status')) {
+             rideStatus.value = statusUpdate['status'];
+           }
+           // TODO: Update currentRide object if needed
+           print('✅ SAHAr Status updated: ${rideStatus.value}');
+         } catch (e) {
+           print('❌ SAHAr Error parsing RideStatusUpdate: $e');
+         }
+       }
     });
 
     // ==================== Ride Chat Events ====================
@@ -372,7 +459,7 @@ class UnifiedSignalRService extends GetxService {
   /// Send location update to SignalR hub
   Future<bool> sendLocationUpdate(double latitude, double longitude) async {
     if (!isConnected.value || _hubConnection == null) {
-      print('⚠️ SAHAr Cannot send location: not connected');
+      // print('⚠️ SAHAr Cannot send location: not connected'); // Optional logging
       return false;
     }
 
@@ -399,116 +486,58 @@ class UnifiedSignalRService extends GetxService {
   }
 
   /// Start continuous location updates
-  Future<void> startLocationUpdates({Duration interval = const Duration(seconds: 5)}) async {
+  void startLocationUpdates() {
     if (isLocationSending.value) {
       print('⚠️ SAHAr Location updates already running');
       return;
     }
 
-    await _loadDriverInfo();
-
-    if (_driverId == null || _driverName == null) {
-      print('❌ SAHAr Cannot start location updates: driver info not available');
-      Get.snackbar('Error', 'Driver information not available. Please login again.');
-      return;
-    }
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-      print('❌ SAHAr Location permission denied');
-      Get.snackbar('Permission Required', 'Location permission is needed for live tracking');
-      return;
-    }
-
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      print('❌ SAHAr Location services are disabled');
-      Get.snackbar('GPS Required', 'Please enable GPS to start location tracking');
-      return;
+    // Check if we have driver info
+    if (_driverId == null) {
+        print('❌ SAHAr Cannot start location updates: driver info not available');
+        return;
     }
 
     isLocationSending.value = true;
     locationUpdateCount.value = 0;
-    print('🚀 SAHAr Starting continuous location updates every ${interval.inSeconds}s');
+    print('🚀 SAHAr Starting signalr location updates listening to LocationService');
 
-    const LocationSettings locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 5,
-    );
-
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen(
-          (Position position) async {
-        if (_shouldSendLocationUpdate(position)) {
-          bool success = await sendLocationUpdate(position.latitude, position.longitude);
-          if (success) {
-            lastSentLocation.value = position;
-          } else if (!isConnected.value) {
-            await connect();
-          }
-        }
-      },
-      onError: (error) {
-        print('❌ SAHAr Position stream error: $error');
-      },
-    );
-
-    _locationTimer = Timer.periodic(interval, (timer) async {
-      try {
-        Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
-
-        bool success = await sendLocationUpdate(position.latitude, position.longitude);
-        if (success) {
-          lastSentLocation.value = position;
-        } else if (!isConnected.value) {
-          await connect();
-        }
-      } catch (e) {
-        print('❌ SAHAr Error getting location in timer: $e');
-      }
+    _locationServiceSubscription?.cancel();
+    _locationServiceSubscription = LocationService.to.currentPosition.listen((Position? position) async {
+         if (position != null && isLocationSending.value) {
+             // Throttling or logic to decide when to send
+             if (_shouldSendLocationUpdate(position)) {
+                 bool success = await sendLocationUpdate(position.latitude, position.longitude);
+                  if (success) {
+                    lastSentLocation.value = position;
+                  } else if (!isConnected.value) {
+                    await connect();
+                  }
+             }
+         }
     });
-
-    // Send initial location immediately
-    try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      bool success = await sendLocationUpdate(position.latitude, position.longitude);
-      if (success) {
-        lastSentLocation.value = position;
-      }
-    } catch (e) {
-      print('❌ SAHAr Error sending initial location: $e');
-    }
   }
 
-  /// Stop continuous location updates
   void stopLocationUpdates() {
-    _stopLocationUpdates();
+    _locationServiceSubscription?.cancel();
+    _locationServiceSubscription = null;
+    isLocationSending.value = false;
+    print('🛑 SAHAr SignalR location updates stopped');
   }
 
+  // Internal helpers
   void _stopLocationUpdates() {
-    _locationTimer?.cancel();
-    _locationTimer = null;
-    _positionStream?.cancel();
-    _positionStream = null;
-    isLocationSending.value = false;
-    print('🛑 SAHAr All location updates stopped');
+      stopLocationUpdates();
   }
 
   void _pauseLocationUpdates() {
-    _positionStream?.pause();
-    print('⏸️ SAHAr Location updates paused');
+      _locationServiceSubscription?.pause();
+      print('⏸️ SAHAr SignalR Location updates paused');
   }
 
   void _resumeLocationUpdates() {
-    if (_positionStream != null && _positionStream!.isPaused) {
-      _positionStream!.resume();
-      print('▶️ SAHAr Location updates resumed');
-    }
+      _locationServiceSubscription?.resume();
+      print('▶️ SAHAr SignalR Location updates resumed');
   }
 
   bool _shouldSendLocationUpdate(Position newPosition) {
@@ -525,23 +554,11 @@ class UnifiedSignalRService extends GetxService {
   }
 
   void _onRideAssigned(String rideId) {
-    Get.snackbar(
-      'Ride Assigned',
-      'You have been assigned ride: ${rideId.substring(0, 8)}...',
-      duration: const Duration(seconds: 5),
-      backgroundColor: Colors.green.shade100,
-      colorText: Colors.green.shade800,
-    );
+    // UI update removed (Snackbar)
   }
 
   void _onRideCompleted(String rideId) {
-    Get.snackbar(
-      'Ride Completed',
-      'Ride ${rideId.substring(0, 8)}... has been completed',
-      duration: const Duration(seconds: 3),
-      backgroundColor: Colors.blue.shade100,
-      colorText: Colors.blue.shade800,
-    );
+    // UI update removed (Snackbar)
   }
 
   // ==================== Ride Chat ====================
@@ -575,6 +592,52 @@ class UnifiedSignalRService extends GetxService {
     }
   }
 
+  /// Load ride chat history from local database for immediate display.
+  Future<List<ChatMessage>> getLocalRideChatHistory(String rideId) async {
+    if (rideId.isEmpty) {
+      print('⚠️ SAHAr Cannot load local chat history - empty ride ID');
+      return [];
+    }
+
+    if (!Get.isRegistered<DatabaseHelper>()) {
+      print('⚠️ SAHAr DatabaseHelper not registered, skipping local chat history load');
+      return [];
+    }
+
+    try {
+      final rows = await DatabaseHelper.to.getRideChatMessages(rideId);
+      final messages = <ChatMessage>[];
+
+      for (final row in rows) {
+        try {
+          final timestampMs = row['timestamp'] as int;
+          final dateTime = DateTime.fromMillisecondsSinceEpoch(timestampMs);
+          final msg = ChatMessage(
+            senderId: row['sender_id']?.toString() ?? '',
+            senderRole: row['sender_role']?.toString() ?? '',
+            message: row['message']?.toString() ?? '',
+            dateTime: dateTime,
+          );
+
+          // Determine alignment using the same rule as SignalR history.
+          final userId = _driverId ?? '';
+          final isFromCurrentUser =
+              msg.senderRole.toLowerCase() == 'driver' || msg.senderId == userId;
+
+          messages.add(msg.copyWith(isFromCurrentUser: isFromCurrentUser));
+        } catch (e) {
+          print('❌ SAHAr Error mapping local chat row: $e');
+        }
+      }
+
+      print('✅ SAHAr Loaded ${messages.length} local ride chat messages for $rideId');
+      return messages;
+    } catch (e) {
+      print('❌ SAHAr Error loading local chat history: $e');
+      return [];
+    }
+  }
+
   /// Send ride chat message
   Future<void> sendRideChatMessage({
     required String rideId,
@@ -583,7 +646,7 @@ class UnifiedSignalRService extends GetxService {
     String? senderRole,
   }) async {
     if (_hubConnection == null || !isConnected.value) {
-      Get.snackbar('Error', 'Not connected to chat service');
+      print('❌ SAHAr Error: Not connected to chat service');
       return;
     }
 
@@ -608,6 +671,12 @@ class UnifiedSignalRService extends GetxService {
       print('📤 SAHAr Optimistically added message to UI. Total: ${rideChatMessages.length}');
       print('📤 SAHAr Sending message with role: $role');
 
+      // Persist optimistically added message locally so history survives restarts.
+      _saveRideChatMessageToLocal(
+        rideId: rideId,
+        message: newMessage,
+      );
+
       // Track message to avoid duplicates
       _recentlySentMessages[message] = now;
       Future.delayed(const Duration(seconds: 5), () {
@@ -630,8 +699,6 @@ class UnifiedSignalRService extends GetxService {
       if (rideChatMessages.isNotEmpty && rideChatMessages.last.message == message) {
         rideChatMessages.removeLast();
       }
-
-      Get.snackbar('Send Error', 'Failed to send message');
     } finally {
       isRideChatSending.value = false;
     }
@@ -682,6 +749,12 @@ class UnifiedSignalRService extends GetxService {
       rideChatMessages.refresh(); // Force UI update
       print('✅ SAHAr Message added to rideChatMessages. Total messages: ${rideChatMessages.length}');
       print('💬 SAHAr Received ride chat message: ${chatMessage.message}');
+
+      // Persist received message locally using current rideId (used for notifications as well).
+      _saveRideChatMessageToLocal(
+        rideId: currentRideId.value.isEmpty ? _emptyGuid : currentRideId.value,
+        message: messageWithUserFlag,
+      );
 
       // Show notification if message is from passenger (not current user)
       if (!isFromCurrentUser) {
@@ -773,6 +846,12 @@ class UnifiedSignalRService extends GetxService {
       rideChatMessages.assignAll(loadedMessages);
       print('✅ SAHAr Loaded ${loadedMessages.length} ride chat messages');
       print('✅ SAHAr rideChatMessages.length after assignAll: ${rideChatMessages.length}');
+
+      // Persist full history locally for offline access.
+      _saveRideChatHistoryToLocal(
+        rideId: currentRideId.value.isEmpty ? _emptyGuid : currentRideId.value,
+        messages: loadedMessages,
+      );
     } catch (e) {
       print('❌ SAHAr Error handling ride chat history: $e');
       print('❌ SAHAr Stack trace: ${StackTrace.current}');
@@ -784,6 +863,61 @@ class UnifiedSignalRService extends GetxService {
   /// Clear ride chat messages
   void clearRideChatMessages() {
     rideChatMessages.clear();
+  }
+
+  // ==================== Ride Chat Local Persistence ====================
+
+  void _saveRideChatMessageToLocal({
+    required String rideId,
+    required ChatMessage message,
+  }) {
+    if (rideId.isEmpty) return;
+    if (!Get.isRegistered<DatabaseHelper>()) {
+      print('⚠️ SAHAr DatabaseHelper not registered, skipping local chat save');
+      return;
+    }
+
+    try {
+      DatabaseHelper.to.insertRideChatMessage(
+        rideId: rideId,
+        senderId: message.senderId,
+        senderRole: message.senderRole,
+        message: message.message,
+        timestamp: message.dateTime,
+      );
+    } catch (e) {
+      print('⚠️ SAHAr Error saving chat message locally: $e');
+    }
+  }
+
+  void _saveRideChatHistoryToLocal({
+    required String rideId,
+    required List<ChatMessage> messages,
+  }) {
+    if (rideId.isEmpty) return;
+    if (!Get.isRegistered<DatabaseHelper>()) {
+      print('⚠️ SAHAr DatabaseHelper not registered, skipping local chat history save');
+      return;
+    }
+
+    () async {
+      try {
+        // Replace existing history for this ride to avoid unbounded growth.
+        await DatabaseHelper.to.clearRideChatMessages(rideId);
+        for (final msg in messages) {
+          await DatabaseHelper.to.insertRideChatMessage(
+            rideId: rideId,
+            senderId: msg.senderId,
+            senderRole: msg.senderRole,
+            message: msg.message,
+            timestamp: msg.dateTime,
+          );
+        }
+        print('✅ SAHAr Saved ${messages.length} chat history messages locally for $rideId');
+      } catch (e) {
+        print('⚠️ SAHAr Error saving chat history locally: $e');
+      }
+    }();
   }
 
   // ==================== Driver-Admin Chat ====================
@@ -823,7 +957,7 @@ class UnifiedSignalRService extends GetxService {
   /// Send driver-admin chat message
   Future<void> sendDriverAdminMessage(String message) async {
     if (!isConnected.value || _hubConnection == null) {
-      Get.snackbar('Not Connected', 'Please wait for connection');
+       print('❌ SAHAr Not Connected, please wait');
       return;
     }
 
@@ -844,7 +978,6 @@ class UnifiedSignalRService extends GetxService {
       await loadDriverAdminChatHistory();
     } catch (e) {
       print('❌ SAHAr Failed to send admin message: $e');
-      Get.snackbar('Send Failed', 'Could not send message');
     } finally {
       isAdminChatSending.value = false;
     }
@@ -929,8 +1062,14 @@ class UnifiedSignalRService extends GetxService {
   @override
   void onClose() {
     _stopLocationUpdates();
+    _connectivitySubscription?.cancel();
     disconnect();
     super.onClose();
   }
 }
+
+
+
+
+
 

@@ -126,7 +126,23 @@ class ChatController extends GetxController {
     }
 
     try {
-      print(' SAHAr Loading chat history via UnifiedSignalR for ride: ${rideId.value}');
+      print(' SAHAr Loading chat history for ride: ${rideId.value}');
+
+      // 1) Load locally persisted history first for instant UI.
+      try {
+        final localMessages =
+            await _signalRService.getLocalRideChatHistory(rideId.value);
+        if (localMessages.isNotEmpty) {
+          _signalRService.rideChatMessages.assignAll(localMessages);
+          print(
+              ' SAHAr Applied ${localMessages.length} local chat messages to UI');
+        }
+      } catch (e) {
+        print(' SAHAr Failed to load local chat history: $e');
+      }
+
+      // 2) Then request server-side history (if available) to refresh.
+      print(' SAHAr Requesting chat history via UnifiedSignalR for ride: ${rideId.value}');
       await _signalRService.loadRideChatHistory(rideId.value);
     } catch (e) {
       print(' SAHAr Failed to request chat history: $e');

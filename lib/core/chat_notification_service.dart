@@ -44,6 +44,13 @@ class ChatNotificationService extends GetxService {
     );
 
     print('🔔 SAHAr Notification service initialized');
+
+    // Refresh permission flag so notifications can work even before chat screen opens.
+    try {
+      await checkNotificationPermission();
+    } catch (e) {
+      print('⚠️ SAHAr Error refreshing notification permission on init: $e');
+    }
   }
 
   /// Handle notification tap

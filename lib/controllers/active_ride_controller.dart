@@ -74,7 +74,7 @@ class ActiveRideController extends GetxController {
         if (isActiveAndRecent) {
           print(' SAHAr ActiveRideController: ✅ Active ride detected, showing popup');
           _showActiveRideDialog(lastRide);
-          return;
+          return; // Don't navigate, let user handle dialog
         } else {
           print(' SAHAr ActiveRideController: ❌ Ride conditions not met');
           if (!isSameDate) {
@@ -91,12 +91,13 @@ class ActiveRideController extends GetxController {
 
       print(' SAHAr ActiveRideController: No active rides found, proceeding to home');
       // No active ride found, proceed to home screen normally
-      _navigateToHome();
+      // Only navigate if we're not already on home screen (e.g., from splash screen)
+      _navigateToHomeIfNeeded();
 
     } catch (e) {
       print(' SAHAr ActiveRideController: Error checking for active ride: $e');
       // On error, proceed to home screen normally
-      _navigateToHome();
+      _navigateToHomeIfNeeded();
     } finally {
       isLoading.value = false;
     }
@@ -206,23 +207,54 @@ class ActiveRideController extends GetxController {
   }
 
   /// Handle when user chooses to continue with the active ride
-  void _handleRideContinuation(RideAssignment activeRide) {
+  Future<void> _handleRideContinuation(RideAssignment activeRide) async {
     try {
       print(' SAHAr ActiveRideController: User chose to continue with active ride');
 
+      // Show loading indicator
+      Get.dialog(
+        const Center(
+          child: CircularProgressIndicator(),
+        ),
+        barrierDismissible: false,
+      );
+
       // Pass ride data to BackgroundTrackingService
-      _backgroundService.resumeActiveRide(activeRide);
+      // This will first connect all services, then resume the ride
+      await _backgroundService.resumeActiveRide(activeRide);
 
-      // Navigate to home screen
-      _navigateToHome();
+      // Close loading dialog
+      Get.back();
 
-    } catch (e) {
+      // Show success message
+      Get.snackbar(
+        'Success',
+        'Active ride resumed successfully',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+
+      // Don't navigate - just stay on current screen to avoid map refresh
+      // The ride is already resumed in background, polyline will be drawn on existing map
+      print(' SAHAr ActiveRideController: Ride resumed without navigation to preserve map state');
+
+    } catch (e, stackTrace) {
+      // Close loading dialog if still open
+      if (Get.isDialogOpen ?? false) {
+        Get.back();
+      }
+
       print(' SAHAr ActiveRideController: Error handling ride continuation: $e');
+      print(' SAHAr ActiveRideController: Stack trace: $stackTrace');
+      
+      // Show error message
       Get.snackbar(
         'Error',
         'Failed to resume active ride. Please try again.',
         backgroundColor: Colors.red,
         colorText: Colors.white,
+        duration: const Duration(seconds: 3),
       );
     }
   }
@@ -231,9 +263,8 @@ class ActiveRideController extends GetxController {
   void _handleRideRejection() {
     print(' SAHAr ActiveRideController: User chose not to continue with active ride');
 
-    // Navigate to home screen without resuming ride
-    _navigateToHome();
-
+    // Just show info message, don't navigate to avoid map refresh
+    // User can start a new ride from current screen
     Get.snackbar(
       'Info',
       'You can start a new ride session.',
@@ -242,9 +273,20 @@ class ActiveRideController extends GetxController {
     );
   }
 
-  /// Navigate to home screen
-  void _navigateToHome() {
-    Get.offAllNamed(AppRoutes.HOME);
+  /// Navigate to home screen only if not already there
+  void _navigateToHomeIfNeeded() {
+    // Check if we're already on the home screen
+    final currentRoute = Get.currentRoute;
+    print(' SAHAr ActiveRideController: Current route: $currentRoute');
+    
+    // Only navigate if we're not already on the main map
+    if (currentRoute != AppRoutes.mainMap) {
+      print(' SAHAr ActiveRideController: Navigating to home screen');
+      // Use offAllNamed to clear the navigation stack (typically from splash screen)
+      Get.offAllNamed(AppRoutes.mainMap);
+    } else {
+      print(' SAHAr ActiveRideController: Already on home screen, no navigation needed');
+    }
   }
   // Get Driver's Last Ride
   Future<List<RideAssignment>?> getDriverLastRide(String driverId) async {
@@ -266,34 +308,85 @@ class ActiveRideController extends GetxController {
             // Map the API response fields to RideAssignment model fields
             final rideData = response.body as Map<String, dynamic>;
 
+            // Convert rideStops to stops format expected by RideStop model
+            List<Map<String, dynamic>> stopsList = [];
+            if (rideData['rideStops'] != null && rideData['rideStops'] is List) {
+              stopsList = (rideData['rideStops'] as List)
+                  .map((stop) => <String, dynamic>{
+                        'stopOrder': stop['stopOrder'] ?? 0,
+                        'location': stop['location'] ?? '',
+                        'latitude': stop['latitude'] ?? 0.0,
+                        'longitude': stop['longitude'] ?? 0.0,
+                      })
+                  .toList();
+            }
+
             // Create a properly mapped ride object
             final mappedRide = {
-              'rideId': rideData['rideId'] ?? 'Unknown',
-              'rideType': rideData['rideType'] ?? 'standard',
-              'fareEstimate': rideData['fareEstimate'],
-              'fareFinal': rideData['fareFinal'] ?? rideData['fareEstimate'] ?? 0.0,
-              'createdAt': rideData['createdAt'] ?? DateTime.now().toIso8601String(),
-              'status': rideData['status'] ?? 'Unknown',
-              'passengerId': rideData['passengerId'] ?? '',
-              'passengerName': rideData['passengerName'] ?? 'Unknown', // This might be missing from API
-              'passengerPhone': rideData['passengerPhone'] ?? '',
-              'pickupLocation': rideData['pickupLocation'] ?? '',
-              'pickUpLat': rideData['pickupLat'] ?? 0.0,
-              'pickUpLon': rideData['pickupLng'] ?? 0.0, // Note: API uses 'pickupLng'
-              'dropoffLocation': rideData['dropOffLocation'] ?? '',
-              'dropoffLat': rideData['dropOffLat'] ?? 0.0,
-              'dropoffLon': rideData['dropOffLng'] ?? 0.0, // Note: API uses 'dropOffLng'
-              'stops': rideData['rideStops'] ?? [], // Note: API uses 'rideStops'
-              'passengerCount': rideData['passengerCount'] ?? 1,
-              'payment': rideData['payment'],
-              'tip': rideData['tip'],
+              'rideId': rideData['rideId']?.toString() ?? 'Unknown',
+              'rideType': rideData['rideType']?.toString() ?? 'standard',
+              'fareEstimate': rideData['fareEstimate'] != null
+                  ? (rideData['fareEstimate'] is num
+                      ? (rideData['fareEstimate'] as num).toDouble()
+                      : double.tryParse(rideData['fareEstimate'].toString()) ?? 0.0)
+                  : null,
+              'fareFinal': rideData['fareFinal'] != null
+                  ? (rideData['fareFinal'] is num
+                      ? (rideData['fareFinal'] as num).toDouble()
+                      : double.tryParse(rideData['fareFinal'].toString()) ?? 0.0)
+                  : (rideData['fareEstimate'] != null
+                      ? (rideData['fareEstimate'] is num
+                          ? (rideData['fareEstimate'] as num).toDouble()
+                          : double.tryParse(rideData['fareEstimate'].toString()) ?? 0.0)
+                      : 0.0),
+              'createdAt': rideData['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
+              'status': rideData['status']?.toString() ?? 'Unknown',
+              'passengerId': rideData['passengerId']?.toString() ?? '',
+              'passengerName': rideData['passengerName']?.toString() ?? 'Unknown',
+              'passengerPhone': rideData['passengerPhone']?.toString() ?? '',
+              'pickupLocation': rideData['pickupLocation']?.toString() ?? '',
+              'pickUpLat': rideData['pickupLat'] != null
+                  ? (rideData['pickupLat'] is num
+                      ? (rideData['pickupLat'] as num).toDouble()
+                      : double.tryParse(rideData['pickupLat'].toString()) ?? 0.0)
+                  : 0.0,
+              'pickUpLon': rideData['pickupLng'] != null
+                  ? (rideData['pickupLng'] is num
+                      ? (rideData['pickupLng'] as num).toDouble()
+                      : double.tryParse(rideData['pickupLng'].toString()) ?? 0.0)
+                  : 0.0,
+              'dropoffLocation': rideData['dropOffLocation']?.toString() ?? '',
+              'dropoffLat': rideData['dropOffLat'] != null
+                  ? (rideData['dropOffLat'] is num
+                      ? (rideData['dropOffLat'] as num).toDouble()
+                      : double.tryParse(rideData['dropOffLat'].toString()) ?? 0.0)
+                  : 0.0,
+              'dropoffLon': rideData['dropOffLng'] != null
+                  ? (rideData['dropOffLng'] is num
+                      ? (rideData['dropOffLng'] as num).toDouble()
+                      : double.tryParse(rideData['dropOffLng'].toString()) ?? 0.0)
+                  : 0.0,
+              'stops': stopsList,
+              'passengerCount': rideData['passengerCount'] != null
+                  ? (rideData['passengerCount'] is int
+                      ? rideData['passengerCount'] as int
+                      : int.tryParse(rideData['passengerCount'].toString()) ?? 1)
+                  : 1,
+              'payment': rideData['payment']?.toString(),
+              'tip': rideData['tip'] != null
+                  ? (rideData['tip'] is num
+                      ? (rideData['tip'] as num).toDouble()
+                      : double.tryParse(rideData['tip'].toString()))
+                  : null,
             };
 
+            print(' SAHAr SAHAr: Mapped ride data: $mappedRide');
             final rideAssignment = RideAssignment.fromJson(mappedRide);
             print(' SAHAr SAHAr: Successfully mapped single ride from API response');
             return [rideAssignment];
-          } catch (e) {
+          } catch (e, stackTrace) {
             print(' SAHAr SAHAr: Error mapping ride data: $e');
+            print(' SAHAr SAHAr: Stack trace: $stackTrace');
             return null;
           }
         } else if (response.body is List) {

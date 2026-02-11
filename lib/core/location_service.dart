@@ -152,6 +152,57 @@ class LocationService extends GetxService {
     );
   }
 
+  /// Calculate bearing between two points (for rotation)
+  double getBearing(LatLng start, LatLng end) {
+    return Geolocator.bearingBetween(
+      start.latitude,
+      start.longitude,
+      end.latitude,
+      end.longitude,
+    );
+  }
+
+  /// Get location stream with optimal settings for background tracking
+  Stream<Position> getLocationStream({bool iOSPlatform = false}) {
+    // ✅ FIXED: Changed from 0 to 5 meters to prevent excessive updates
+    // This prevents map rebuilds every ~16ms when stationary
+    final LocationSettings settings = LocationSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 5, // Minimum 5 meters movement required for update
+    );
+
+    return Geolocator.getPositionStream(
+      locationSettings: settings,
+    );
+  }
+
+  /// Request background location permissions
+  Future<bool> requestBackgroundPermissions() async {
+    try {
+      // Request location permission first
+      var locationStatus = await Permission.location.request();
+      if (locationStatus != PermissionStatus.granted) {
+        Get.snackbar('Permission Required', 'Location permission is required for tracking');
+        return false;
+      }
+
+      // Request background location permission (Android 10+)
+      if (await Permission.locationAlways.isRestricted ||
+          await Permission.locationAlways.isDenied) {
+        var backgroundStatus = await Permission.locationAlways.request();
+        if (backgroundStatus != PermissionStatus.granted) {
+          Get.snackbar('Background Permission',
+              'Background location permission helps track rides accurately');
+        }
+      }
+
+      return true;
+    } catch (e) {
+      print('❌ Error requesting background permissions: $e');
+      return false;
+    }
+  }
+
   /// Check if location services are enabled
   Future<bool> isLocationServiceEnabled() async {
     return await Geolocator.isLocationServiceEnabled();

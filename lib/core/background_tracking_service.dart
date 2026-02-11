@@ -11,6 +11,7 @@ import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/core/global_variables.dart';
 import 'package:pick_u_driver/core/ride_notification_service.dart';
 import 'package:pick_u_driver/core/notification_sound_service.dart';
+import 'package:pick_u_driver/core/internet_connectivity_service.dart';
 import 'package:pick_u_driver/driver_screen/widget/modern_payment_dialog.dart';
 import 'package:pick_u_driver/models/ride_assignment_model.dart'; 
 import 'package:pick_u_driver/routes/app_routes.dart';
@@ -18,6 +19,9 @@ import 'package:signalr_core/signalr_core.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:pick_u_driver/utils/theme/mcolors.dart';
+import 'package:pick_u_driver/core/map_service.dart';
+import 'package:pick_u_driver/core/database_helper.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class BackgroundTrackingService extends GetxService {
   static BackgroundTrackingService get to => Get.find();
@@ -63,7 +67,8 @@ class BackgroundTrackingService extends GetxService {
   var isSubscribed = false.obs;
   var currentRide = Rxn<RideAssignment>();
   var rideStatus = 'No Active Ride'.obs;
-  var routePolylines = <Polyline>{}.obs;
+  // ⚠️ DEPRECATED: routePolylines - Now using MapService.polylines as Single Source of Truth
+  // var routePolylines = <Polyline>{}.obs;
   var rideMarkers = <Marker>{}.obs;
 
   // Driver info
@@ -71,17 +76,38 @@ class BackgroundTrackingService extends GetxService {
   String? _driverName;
 
   // Timers and streams
-  Timer? _locationTimer;
   StreamSubscription<Position>? _positionStream;
   Timer? _reconnectionTimer;
+  StreamSubscription<bool>? _connectivitySubscription;
 
+  // Route update throttling
+  DateTime? _lastRouteUpdateTime;
+  LatLng? _lastRouteUpdatePosition;
+  static const double _routeUpdateDistanceThreshold = 50.0; // meters
+  static const Duration _routeUpdateTimeThreshold = Duration(seconds: 10); // ✅ Update every 10 seconds (like Uber)
+  
+  // Prevent concurrent route updates
+  bool _isUpdatingRoute = false;
+  
+  // Track last connectivity state to detect changes
+  bool _wasConnectedToInternet = true;
+
+  // Connection/subscription state guards
+  bool _isConnecting = false;
+  bool _isSubscribing = false;
+
+  // Marker update debouncing
+  Timer? _markerUpdateDebounce;
+  Position? _pendingMarkerUpdate;
+
+  // WakeLock management
+  bool _isWakeLockEnabled = false;
   // Configuration
   static const String _hubUrl = 'https://api.pickurides.com/ridechathub/';
   static const String _emptyGuid = '00000000-0000-0000-0000-000000000000';
-  static const double _minimumDistanceFilter = 10.0; // meters
-  static const int _locationUpdateIntervalSeconds = 5;
+  static const double _minimumDistanceFilter = 2.0; // meters
 
-  // Custom marker icons
+  // Custom marker icons (driver/taxi marker is handled by MapService)
   BitmapDescriptor? _currentLocationIcon;
   BitmapDescriptor? _pickupIcon;
   BitmapDescriptor? _destinationIcon;
@@ -93,11 +119,117 @@ class BackgroundTrackingService extends GetxService {
     _loadDriverInfo();
     _initializeConnection();
     _loadCustomMarkers();
+    _setupConnectivityListener();
+  }
+
+  /// Setup listener for internet connectivity changes
+  void _setupConnectivityListener() {
+    try {
+      if (!Get.isRegistered<InternetConnectivityService>()) {
+        print('⚠️ SAHAr InternetConnectivityService not registered yet in BackgroundTrackingService');
+        return;
+      }
+
+      final connectivityService = InternetConnectivityService.to;
+      
+      // Listen to connectivity changes
+      _connectivitySubscription = connectivityService.isConnected.listen((isConnected) {
+        print('🌐 SAHAr [BG] Internet connectivity changed: $isConnected');
+        _handleConnectivityChange(isConnected);
+      });
+
+      print('✅ SAHAr [BG] Connectivity listener setup complete');
+    } catch (e) {
+      print('❌ SAHAr [BG] Error setting up connectivity listener: $e');
+    }
+  }
+
+  /// Handle internet connectivity changes
+  void _handleConnectivityChange(bool isConnectedToInternet) {
+    // Internet connection restored
+    if (isConnectedToInternet && !_wasConnectedToInternet) {
+      print('🟢 SAHAr [BG] Internet restored');
+      _onInternetRestored();
+    } 
+    // Internet connection lost
+    else if (!isConnectedToInternet && _wasConnectedToInternet) {
+      print('🔴 SAHAr [BG] Internet lost');
+      _onInternetLost();
+    }
+
+    _wasConnectedToInternet = isConnectedToInternet;
+  }
+
+  /// Handle internet connection restored
+  Future<void> _onInternetRestored() async {
+    try {
+      print('🔄 SAHAr [BG] Internet restored, reconnecting...');
+
+      // 1. Ensure SignalR connection + subscription in a single idempotent flow
+      await _ensureConnectedAndSubscribed();
+
+      // 2. Resume location updates if active
+      if (isLocationSending.value) {
+        _resumeLocationUpdates();
+      }
+
+      // 3. Recalculate route if we have an active ride
+      if (currentRide.value != null && _locationService?.currentLatLng.value != null) {
+        print('🗺️ SAHAr [BG] Recalculating route after internet restoration');
+        await _recalculateRoute();
+      }
+
+      // 4. Sync any offline data
+      _syncOfflineData();
+
+    } catch (e) {
+      print('❌ SAHAr [BG] Error handling internet restoration: $e');
+    }
+  }
+
+  /// Handle internet connection lost
+  void _onInternetLost() {
+    print('⏸️ SAHAr [BG] Internet lost, will buffer location updates');
+    // Location tracking continues, SignalR will buffer/retry automatically
+    // We just log this event for debugging
+  }
+
+  /// Recalculate route from current position
+  Future<void> _recalculateRoute() async {
+    if (_isUpdatingRoute) {
+      print('⏸️ SAHAr Route recalculation already in progress');
+      return;
+    }
+
+    final ride = currentRide.value;
+    if (ride == null) return;
+
+    try {
+      _isUpdatingRoute = true;
+      
+      // Reset route update tracking so it updates immediately
+      _lastRouteUpdatePosition = null;
+      _lastRouteUpdateTime = null;
+
+      // Trigger route update based on current ride status
+      if (ride.status == 'Waiting') {
+        await _showRouteToPickup(ride);
+      } else if (ride.status == 'In-Progress') {
+        await _showRouteToAllStops(ride);
+      }
+
+      print('✅ SAHAr Route recalculated after internet restoration');
+    } catch (e) {
+      print('❌ SAHAr Error recalculating route: $e');
+    } finally {
+      _isUpdatingRoute = false;
+    }
   }
 
   /// Load custom marker icons
   Future<void> _loadCustomMarkers() async {
     try {
+      // Note: Taxi marker is handled by MapService, we only load point markers here
       _currentLocationIcon = await BitmapDescriptor.asset(
         const ImageConfiguration(size: Size(48, 48)),
         'assets/img/points.png',
@@ -118,7 +250,7 @@ class BackgroundTrackingService extends GetxService {
         'assets/img/points.png',
       );
 
-      print('✅ SAHAr Custom markers loaded');
+      print('✅ SAHAr Custom point markers loaded');
     } catch (e) {
       print('⚠️ SAHAr Failed to load custom markers: $e');
       // Fallback to default markers
@@ -189,13 +321,77 @@ class BackgroundTrackingService extends GetxService {
   }
 
   /// Resume an active ride with the provided ride data
-  void resumeActiveRide(RideAssignment activeRide) {
+  /// First connects all services, then resumes the ride
+  Future<void> resumeActiveRide(RideAssignment activeRide) async {
     try {
       print('🔄 SAHAr Resuming active ride: ${activeRide.rideId}');
+      print('🔄 SAHAr Step 1: Connecting services first...');
 
+      // ============================================================
+      // STEP 1: Connect all services FIRST (SignalR, Tracking, etc.)
+      // ============================================================
+      
+      // 1. Start location tracking if not already running
+      if (!isRunning.value) {
+        print('🔄 SAHAr Starting background tracking service...');
+        await startTracking();
+        print('✅ SAHAr Background tracking service started');
+      } else {
+        print('✅ SAHAr Background tracking already running');
+      }
+
+      // 2. Connect to SignalR if not connected
+      if (!isConnected.value) {
+        print('🔄 SAHAr Connecting to SignalR hub...');
+        await connectToHub();
+        
+        // Wait a bit for connection to stabilize
+        int retries = 0;
+        while (!isConnected.value && retries < 5) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          retries++;
+        }
+        
+        if (isConnected.value) {
+          print('✅ SAHAr Connected to SignalR hub');
+        } else {
+          print('⚠️ SAHAr SignalR connection pending, continuing anyway');
+        }
+      } else {
+        print('✅ SAHAr SignalR already connected');
+      }
+
+      // 3. Wait for location service to be ready
+      if (_locationService != null) {
+        print('🔄 SAHAr Getting current location...');
+        await _locationService!.getCurrentLocation();
+        
+        // Wait for location to be available
+        int retries = 0;
+        while (_locationService!.currentLatLng.value == null && retries < 5) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          await _locationService!.getCurrentLocation();
+          retries++;
+        }
+        
+        if (_locationService!.currentLatLng.value != null) {
+          print('✅ SAHAr Current location obtained');
+        } else {
+          print('⚠️ SAHAr Location not available yet, continuing anyway');
+        }
+      }
+
+      print('✅ SAHAr All services connected!');
+      print('🔄 SAHAr Step 2: Setting up ride data...');
+
+      // ============================================================
+      // STEP 2: Now set up the ride data (after everything is connected)
+      // ============================================================
+      
       // Set current ride information
       currentRideId.value = activeRide.rideId;
-      rideStatus.value = 'Resuming ${activeRide.status}';
+      // Set rideStatus to actual status (not "Resuming...") so route drawing works
+      rideStatus.value = activeRide.status;
 
       // Create RideAssignment from DriverLastRideModel
       final rideAssignment = RideAssignment(
@@ -221,26 +417,27 @@ class BackgroundTrackingService extends GetxService {
           longitude: rs.longitude,  
         )).toList(),
         passengerCount: activeRide.passengerCount,
+        payment: activeRide.payment,
+        tip: activeRide.tip,
       );
 
       currentRide.value = rideAssignment;
 
-      // Update markers and route
+      // Update markers
       _updateMarkersForActiveRide(activeRide);
 
-      // Start location tracking if not already running
-      if (!isRunning.value) {
-        startTracking();
-      }
+      // Draw route based on ride status (this will show polylines)
+      print('🔄 SAHAr Step 3: Drawing route...');
+      _updateUIForRideStatus(rideAssignment);
 
-      // Connect to SignalR if not connected
-      if (!isConnected.value) {
-        connectToHub();
-      }
-
-      print('✅ SAHAr Active ride resumed successfully');
-    } catch (e) {
-      print('❌ SAHAr Error resuming active ride: $e');
+      print('✅ SAHAr Active ride resumed successfully - All services connected and ride set up!');
+      
+    } catch (e, stackTrace) {
+      // Log critical errors
+      print('❌ SAHAr Critical error resuming active ride: $e');
+      print('❌ SAHAr Stack trace: $stackTrace');
+      // Re-throw so controller can handle it
+      rethrow;
     }
   }
 
@@ -297,7 +494,7 @@ class BackgroundTrackingService extends GetxService {
         );
       }
 
-      rideMarkers.value = markers;
+      rideMarkers.assignAll(markers);
       print('✅ SAHAr Updated markers for active ride: ${markers.length} markers');
     } catch (e) {
       print('❌ SAHAr Error updating markers for active ride: $e');
@@ -559,9 +756,12 @@ class BackgroundTrackingService extends GetxService {
       // Initialize ActiveRideController after successful reconnection
       _initializeActiveRideController();
 
-      // Re-subscribe to ride assignments
+      // Sync offline data after reconnection
+      _syncOfflineData();
+
+      // Re-subscribe to ride assignments (idempotent unified flow)
       if (_driverId != null) {
-        _autoSubscribe();
+        _ensureConnectedAndSubscribed();
       }
     });
 
@@ -747,7 +947,9 @@ class BackgroundTrackingService extends GetxService {
     _reconnectionTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (!isConnected.value) {
         print('🔄 SAHAr Attempting reconnection...');
-        _connect();
+        // Use unified connection/subscription flow so we don't create
+        // duplicate connections or subscriptions.
+        _ensureConnectedAndSubscribed();
       } else {
         _stopReconnectionTimer();
       }
@@ -761,6 +963,13 @@ class BackgroundTrackingService extends GetxService {
 
   /// Connect to SignalR hub
   Future<bool> _connect() async {
+    // Prevent overlapping connect attempts
+    if (_isConnecting) {
+      print('⏳ SAHAr Connect requested while another connect is in progress. Skipping.');
+      return false;
+    }
+
+    _isConnecting = true;
     if (_hubConnection != null) {
       try {
         final state = _hubConnection!.state;
@@ -781,9 +990,22 @@ class BackgroundTrackingService extends GetxService {
       await _initializeConnection();
     }
 
-    if (_hubConnection == null) return false;
+    if (_hubConnection == null) {
+      _isConnecting = false;
+      return false;
+    }
 
     try {
+      // Log current internet connectivity alongside hub state
+      bool internetOk = true;
+      String connectionType = 'unknown';
+      if (Get.isRegistered<InternetConnectivityService>()) {
+        final svc = InternetConnectivityService.to;
+        internetOk = svc.isConnected.value;
+        connectionType = svc.connectionType.value;
+      }
+      print('🌐 SAHAr Attempting hub start - internetOk=$internetOk, type=$connectionType');
+
       connectionStatus.value = 'Connecting...';
       await _hubConnection!.start();
       isConnected.value = true;
@@ -793,63 +1015,69 @@ class BackgroundTrackingService extends GetxService {
       // Initialize ActiveRideController after successful connection
       _initializeActiveRideController();
 
+      // Sync offline data after successful connection
+      _syncOfflineData();
+
       return true;
     } catch (e) {
       print('❌ SAHAr Connection failed: $e');
       connectionStatus.value = 'Failed';
       _hubConnection = null;
       return false;
+    } finally {
+      _isConnecting = false;
     }
   }
 
-  /// Auto-subscribe with retry logic (wait for connection)
+  /// Auto-subscribe helper (expects connection to be ready).
+  /// This no longer manages its own long-running retry timers; callers
+  /// should use [_ensureConnectedAndSubscribed] for a full flow.
   Future<void> _autoSubscribe() async {
     if (_driverId == null || _driverId!.isEmpty) {
       print('❌ SAHAr Cannot auto-subscribe: Driver ID not available');
       return;
     }
 
-    print('🔄 SAHAr Starting auto-subscribe...');
-
-    // Wait for connection with retries
-    int retries = 0;
-    const maxRetries = 10;
-
-    while (connectionStatus.value != 'Connected' && retries < maxRetries) {
-      print('⏳ SAHAr Waiting for connection... (${retries + 1}/$maxRetries)');
-      await Future.delayed(const Duration(seconds: 1));
-      retries++;
+    if (!isConnected.value || _hubConnection == null) {
+      print('⚠️ SAHAr Auto-subscribe skipped: hub not connected');
+      return;
     }
 
-    if (connectionStatus.value == 'Connected') {
-      await _subscribeToRideAssignments();
-      print('✅ SAHAr Auto-subscribe completed successfully');
-    } else {
-      print('❌ SAHAr Auto-subscribe failed: connection timeout after $maxRetries retries');
-
-      Get.snackbar(
-        'Connection Issue',
-        'Could not subscribe to ride assignments. Retrying...',
-        backgroundColor: Colors.orange.shade100,
-        colorText: Colors.orange.shade800,
-        duration: const Duration(seconds: 3),
-      );
-
-      // Retry after delay
-      Timer(const Duration(seconds: 5), () => _autoSubscribe());
+    if (isSubscribed.value) {
+      print('ℹ️ SAHAr Auto-subscribe skipped: already subscribed');
+      return;
     }
+
+    await _subscribeToRideAssignments();
   }
 
   /// Subscribe to ride assignments
   Future<void> _subscribeToRideAssignments() async {
-    if (_hubConnection == null || _driverId == null) return;
+    if (_hubConnection == null || _driverId == null) {
+      print('⚠️ SAHAr Cannot subscribe: hubConnection or driverId is null');
+      return;
+    }
 
+    if (isSubscribed.value) {
+      print('ℹ️ SAHAr Already subscribed, skipping SubscribeDriver invoke');
+      return;
+    }
+
+    if (_isSubscribing) {
+      print('⏳ SAHAr Subscription already in progress, skipping new request');
+      return;
+    }
+
+    _isSubscribing = true;
     try {
+      print('🔔 SAHAr Invoking SubscribeDriver for driverId=$_driverId');
       await _hubConnection!.invoke('SubscribeDriver', args: [_driverId]);
       isSubscribed.value = true;
       print('✅ SAHAr Subscribed to rides for: $_driverId');
     } catch (e) {
       print('❌ SAHAr Subscription error: $e');
+    } finally {
+      _isSubscribing = false;
     }
   }
 
@@ -864,6 +1092,44 @@ class BackgroundTrackingService extends GetxService {
       _resetRide();
     } catch (e) {
       print('❌ SAHAr Unsubscribe error: $e');
+    }
+  }
+
+  /// Ensure that the hub is connected and the driver is subscribed.
+  /// This method is idempotent and guarded against concurrent executions.
+  Future<void> _ensureConnectedAndSubscribed() async {
+    // Make sure we have a driverId
+    if (_driverId == null || _driverId!.isEmpty) {
+      print('⚠️ SAHAr _ensureConnectedAndSubscribed: driverId missing, reloading...');
+      await _loadDriverInfo();
+      if (_driverId == null || _driverId!.isEmpty) {
+        print('❌ SAHAr _ensureConnectedAndSubscribed: driverId still missing, aborting');
+        return;
+      }
+    }
+
+    // Avoid overlapping flows
+    if (_isConnecting || _isSubscribing) {
+      print('⏳ SAHAr _ensureConnectedAndSubscribed already in progress, skipping');
+      return;
+    }
+
+    // STEP 1: Ensure connection
+    if (!isConnected.value || _hubConnection == null || _hubConnection!.state == HubConnectionState.disconnected) {
+      final connected = await _connect();
+      if (!connected) {
+        print('❌ SAHAr _ensureConnectedAndSubscribed: connect() failed');
+        return;
+      }
+    } else {
+      print('ℹ️ SAHAr _ensureConnectedAndSubscribed: hub already connected');
+    }
+
+    // STEP 2: Ensure subscription
+    if (!isSubscribed.value) {
+      await _autoSubscribe();
+    } else {
+      print('ℹ️ SAHAr _ensureConnectedAndSubscribed: already subscribed');
     }
   }
 
@@ -1011,121 +1277,188 @@ class BackgroundTrackingService extends GetxService {
       return;
     }
 
-    switch (ride.status) {
-      case 'Waiting':
-        _rideNotificationService!.notifyNewRide(
-          rideId: ride.rideId,
-          pickupLocation: ride.pickupLocation,
-          passengerName: ride.passengerName,
-        );
-        break;
-      case 'In-Progress':
-        _rideNotificationService!.notifyRideInProgress(
-          rideId: ride.rideId,
-          destination: ride.dropoffLocation,
-        );
-        break;
-      case 'Completed':
-        _rideNotificationService!.notifyRideCompleted(
-          rideId: ride.rideId,
-          fare: ride.fareFinal,
-        );
-        break;
+    try {
+      switch (ride.status) {
+        case 'Waiting':
+          _rideNotificationService?.notifyNewRide(
+            rideId: ride.rideId,
+            pickupLocation: ride.pickupLocation,
+            passengerName: ride.passengerName,
+          );
+          break;
+        case 'In-Progress':
+          _rideNotificationService?.notifyRideInProgress(
+            rideId: ride.rideId,
+            destination: ride.dropoffLocation,
+          );
+          break;
+        case 'Completed':
+          _rideNotificationService?.notifyRideCompleted(
+            rideId: ride.rideId,
+            fare: ride.fareFinal,
+          );
+          break;
+      }
+    } catch (e) {
+      print('❌ SAHAr Error triggering notification: $e');
     }
   }
 
   /// Show route to pickup with custom markers
   Future<void> _showRouteToPickup(RideAssignment ride) async {
+    // Prevent concurrent updates
+    if (_isUpdatingRoute) {
+      print('⏸️ SAHAr Route update already in progress, skipping...');
+      return;
+    }
+    
+    _isUpdatingRoute = true;
     try {
-      if (_locationService == null) return;
-      await _locationService!.getCurrentLocation();
-      if (_locationService!.currentLatLng.value == null) return;
+      if (_locationService == null) {
+        print('⚠️ SAHAr Location service is null, cannot show route to pickup');
+        // Retry after a delay
+        Future.delayed(const Duration(seconds: 2), () {
+          if (_locationService != null) {
+            _showRouteToPickup(ride);
+          }
+        });
+        _isUpdatingRoute = false;
+        return;
+      }
+      
+      // Try to get current location with retries
+      int retries = 3;
+      while (retries > 0) {
+        await _locationService!.getCurrentLocation();
+        if (_locationService!.currentLatLng.value != null) {
+          break;
+        }
+        retries--;
+        if (retries > 0) {
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      }
+      
+      if (_locationService!.currentLatLng.value == null) {
+        print('⚠️ SAHAr Current location is null after retries, cannot show route to pickup');
+        return;
+      }
 
       final origin = _locationService!.currentLatLng.value!;
       final pickup = LatLng(ride.pickUpLat, ride.pickUpLon);
 
+      // ✅ Draw route from driver to pickup (only 1 polyline)
+      // NOTE: useStraightLineOnError=false so that on API failure we keep the
+      // existing polyline instead of replacing it with a synthetic straight line.
       final points = await GoogleDirectionsService.getRoutePoints(
         origin: origin,
         destination: pickup,
+        useStraightLineOnError: false,
       );
 
-      final polyline = Polyline(
-        polylineId: const PolylineId('route_to_pickup'),
-        points: points,
-        color: Colors.orange,
-        width: 5,
-      );
+      _setPolyline(points, Colors.orange);
 
-      routePolylines.assignAll({polyline});
-
+      // ✅ Show only pickup marker (driver marker handled by MapService)
       final markers = <Marker>{
-        Marker(
-          markerId: const MarkerId('current_location'),
-          position: origin,
-          infoWindow: const InfoWindow(title: 'Your Location'),
-          icon: _currentLocationIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-        ),
         Marker(
           markerId: const MarkerId('pickup'),
           position: pickup,
-          infoWindow: InfoWindow(title: 'Pickup', snippet: ride.pickupLocation),
+          infoWindow: InfoWindow(title: 'Pickup Location', snippet: ride.pickupLocation),
           icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
         ),
       };
 
       rideMarkers.assignAll(markers);
-      print('✅ SAHAr Route to pickup displayed with custom markers');
+      
+      print('✅ SAHAr Route to pickup displayed - Driver → Pickup (1 polyline)');
     } catch (e) {
       print('❌ SAHAr Error showing pickup route: $e');
+    } finally {
+      _isUpdatingRoute = false;
     }
   }
 
-  /// Show route to all stops with custom markers
+  /// Show route to next stop only (not all stops)
   Future<void> _showRouteToAllStops(RideAssignment ride) async {
+    // Prevent concurrent updates
+    if (_isUpdatingRoute) {
+      print('⏸️ SAHAr Route update already in progress, skipping...');
+      return;
+    }
+    
+    _isUpdatingRoute = true;
     try {
-      if (_locationService == null) return;
-      await _locationService!.getCurrentLocation();
-      if (_locationService!.currentLatLng.value == null) return;
+      if (_locationService == null) {
+        print('⚠️ SAHAr Location service is null, cannot show route to stops');
+        // Retry after a delay
+        Future.delayed(const Duration(seconds: 2), () {
+          if (_locationService != null) {
+            _showRouteToAllStops(ride);
+          }
+        });
+        _isUpdatingRoute = false;
+        return;
+      }
+      
+      // Try to get current location with retries
+      int retries = 3;
+      while (retries > 0) {
+        await _locationService!.getCurrentLocation();
+        if (_locationService!.currentLatLng.value != null) {
+          break;
+        }
+        retries--;
+        if (retries > 0) {
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      }
+      
+      if (_locationService!.currentLatLng.value == null) {
+        print('⚠️ SAHAr Current location is null after retries, cannot show route to stops');
+        return;
+      }
 
       final origin = _locationService!.currentLatLng.value!;
-      final waypoints = ride.stops
+      final allStops = ride.stops
           .map((stop) => LatLng(stop.latitude, stop.longitude))
           .toList();
 
-      if (waypoints.isEmpty) return;
+      if (allStops.isEmpty) return;
 
+      // ✅ Only draw route to NEXT stop (first stop in list)
+      // This is the immediate destination, not all stops
+      final nextStop = allStops.first;
+
+      // Get route from driver to next stop only (NO waypoints)
+      // NOTE: useStraightLineOnError=false so that on API failure we keep the
+      // existing polyline instead of replacing it with a synthetic straight line.
       final points = await GoogleDirectionsService.getRoutePoints(
         origin: origin,
-        destination: waypoints.last,
-        waypoints: waypoints.length > 1 ? waypoints.sublist(0, waypoints.length - 1) : null,
+        destination: nextStop,
+        // No waypoints - direct route to next stop only
+        useStraightLineOnError: false,
       );
 
-      final polyline = Polyline(
-        polylineId: const PolylineId('route_with_stops'),
-        points: points,
-        color: MColor.primaryNavy,
-        width: 5,
-      );
+      // Draw single polyline from driver to next stop
+      _setPolyline(points, MColor.primaryNavy);
 
-      routePolylines.assignAll({polyline});
-
-      final markers = <Marker>{
-        Marker(
-          markerId: const MarkerId('current_location'),
-          position: origin,
-          infoWindow: const InfoWindow(title: 'Your Location'),
-          icon: _currentLocationIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-        ),
-      };
+      // ✅ Show markers for all stops (for visual reference)
+      final markers = <Marker>{};
 
       for (var stop in ride.stops) {
         final isDestination = stop.stopOrder == ride.stops.length - 1;
+        final isNextStop = stop.stopOrder == 0; // First stop is next
+        
         markers.add(
           Marker(
             markerId: MarkerId('stop_${stop.stopOrder}'),
             position: LatLng(stop.latitude, stop.longitude),
             infoWindow: InfoWindow(
-              title: isDestination ? 'Destination' : 'Stop ${stop.stopOrder + 1}',
+              title: isDestination 
+                  ? 'Final Destination' 
+                  : isNextStop 
+                      ? 'Next Stop' 
+                      : 'Stop ${stop.stopOrder + 1}',
               snippet: stop.location,
             ),
             icon: isDestination
@@ -1136,14 +1469,20 @@ class BackgroundTrackingService extends GetxService {
       }
 
       rideMarkers.assignAll(markers);
-      print('✅ SAHAr Route with all stops displayed with custom markers');
+      
+      print('✅ SAHAr Route to NEXT stop displayed - Driver → Next Stop (1 polyline)');
     } catch (e) {
       print('❌ SAHAr Error showing route: $e');
+    } finally {
+      _isUpdatingRoute = false;
     }
   }
 
   void _showCompletedRide(RideAssignment ride) {
-    routePolylines.clear();
+    // ✅ Clear route using MapService
+    if (Get.isRegistered<MapService>()) {
+      MapService.to.polylines.clear();
+    }
     rideMarkers.clear();
 
     print('💰 SAHAr _showCompletedRide called for ride: ${ride.rideId}');
@@ -1209,7 +1548,10 @@ class BackgroundTrackingService extends GetxService {
   void _resetRide() {
     currentRide.value = null;
     rideStatus.value = 'No Active Ride';
-    routePolylines.clear();
+    // ✅ Clear route using MapService
+    if (Get.isRegistered<MapService>()) {
+      MapService.to.polylines.clear();
+    }
     rideMarkers.clear();
     currentRideId.value = '';
     isWaitingForPayment.value = false;
@@ -1224,7 +1566,7 @@ class BackgroundTrackingService extends GetxService {
 
   /// Public method to connect to hub (called by ActiveRideController)
   Future<void> connectToHub() async {
-    await _connect();
+    await _ensureConnectedAndSubscribed();
   }
 
   /// Manual reconnect (public method for UI)
@@ -1239,10 +1581,9 @@ class BackgroundTrackingService extends GetxService {
       duration: const Duration(seconds: 2),
     );
 
-    bool connected = await _connect();
+    await _ensureConnectedAndSubscribed();
 
-    if (connected && _driverId != null) {
-      await _autoSubscribe();
+    if (isConnected.value && isSubscribed.value) {
 
       Get.snackbar(
         'Reconnected',
@@ -1264,135 +1605,281 @@ class BackgroundTrackingService extends GetxService {
 
   /// Send location update
   Future<bool> sendLocationUpdate(double latitude, double longitude) async {
-    if (!isConnected.value || _hubConnection == null) {
-      print('❌ SAHAr Cannot send location: not connected');
-      return false;
-    }
-
+    print('📤 SAHAr sendLocationUpdate called: $latitude, $longitude');
+    
     if (_driverId == null || _driverName == null || _driverId!.isEmpty || _driverName!.isEmpty) {
       print('❌ SAHAr Driver info missing, attempting to reload...');
       await _loadDriverInfo();
 
       if (_driverId == null || _driverName == null || _driverId!.isEmpty || _driverName!.isEmpty) {
-        print('❌ SAHAr Cannot send location: driver info still missing after reload');
+        print('❌ SAHAr Driver info still missing after reload - cannot send location');
         return false;
       }
     }
 
+    final String rideId = currentRideId.value.isEmpty ? _emptyGuid : currentRideId.value;
+    print('📤 SAHAr Sending location - RideId: $rideId, DriverId: $_driverId');
+
+    // Try to send directly if connected
+    if (isConnected.value && _hubConnection != null) {
+      try {
+        print('📡 SAHAr Invoking UpdateLocation on SignalR...');
+        await _hubConnection!.invoke(
+          'UpdateLocation',
+          args: [rideId, _driverId, latitude, longitude],
+        );
+
+        locationUpdateCount.value++;
+        print('✅ SAHAr Location sent successfully! Count: ${locationUpdateCount.value}');
+
+        // Try to sync any offline buffered locations
+        _syncOfflineData();
+
+        return true;
+      } catch (e) {
+        print('❌ SAHAr Location send error (online): $e');
+        // Fall through to offline save
+      }
+    } else {
+      print('⚠️ SAHAr Not connected to SignalR - isConnected: ${isConnected.value}, hubConnection: ${_hubConnection != null}');
+      print('❌ SAHAr Cannot send location: not connected, saving offline');
+    }
+
+    // If we reach here, save location offline
+    await _saveOfflineLocation(latitude, longitude, rideId);
+    return false;
+  }
+
+  Future<void> _saveOfflineLocation(
+    double latitude,
+    double longitude,
+    String rideId,
+  ) async {
     try {
-      String rideId = currentRideId.value.isEmpty ? _emptyGuid : currentRideId.value;
-
-      await _hubConnection!.invoke(
-        'UpdateLocation',
-        args: [rideId, _driverId, latitude, longitude],
-      );
-
-      locationUpdateCount.value++;
-     return true;
+      if (Get.isRegistered<DatabaseHelper>()) {
+        await DatabaseHelper.to.insertLocation(latitude, longitude, rideId);
+        print('💾 SAHAr Location buffered offline for ride: $rideId');
+      } else {
+        print('⚠️ SAHAr DatabaseHelper not registered, cannot buffer location');
+      }
     } catch (e) {
-      print('❌ SAHAr Location send error: $e');
-      return false;
+      print('❌ SAHAr Error saving offline location: $e');
+    }
+  }
+
+  Future<void> _syncOfflineData() async {
+    if (!isConnected.value || _hubConnection == null) return;
+
+    if (!Get.isRegistered<DatabaseHelper>()) {
+      print('⚠️ SAHAr DatabaseHelper not available for sync');
+      return;
+    }
+
+    try {
+      final helper = DatabaseHelper.to;
+      final unsynced = await helper.getUnsyncedLocations(limit: 50);
+
+      if (unsynced.isEmpty) {
+        return;
+      }
+
+      print('🔄 SAHAr Syncing ${unsynced.length} offline locations...');
+
+      final List<int> syncedIds = [];
+
+      for (final row in unsynced) {
+        try {
+          final int id = row['id'] as int;
+          final double lat = (row['lat'] as num).toDouble();
+          final double lng = (row['lng'] as num).toDouble();
+          final String rideId = row['ride_id']?.toString() ?? _emptyGuid;
+
+          await _hubConnection!.invoke(
+            'UpdateLocation',
+            args: [rideId, _driverId, lat, lng],
+          );
+
+          syncedIds.add(id);
+        } catch (e) {
+          print('❌ SAHAr Error syncing offline location row: $e');
+          // Stop on first failure to avoid hammering server
+          break;
+        }
+      }
+
+      if (syncedIds.isNotEmpty) {
+        await helper.markLocationsAsSynced(syncedIds);
+        await helper.deleteSyncedLocations();
+        print('✅ SAHAr Offline locations synced & cleaned: ${syncedIds.length}');
+      }
+    } catch (e) {
+      print('❌ SAHAr Error during offline sync: $e');
     }
   }
 
   /// Check if location update should be sent
   bool _shouldSendLocationUpdate(Position newPosition) {
-    if (lastSentLocation.value == null) return true;
+    // Always send first location
+    if (lastSentLocation.value == null) {
+      print('📍 SAHAr First location - will send to server');
+      return true;
+    }
+    
+    if (_locationService == null) return true;
 
-    double distance = Geolocator.distanceBetween(
-      lastSentLocation.value!.latitude,
-      lastSentLocation.value!.longitude,
-      newPosition.latitude,
-      newPosition.longitude,
+    // Calculate distance from last sent position
+    double distance = _locationService!.calculateDistance(
+      LatLng(lastSentLocation.value!.latitude, lastSentLocation.value!.longitude),
+      LatLng(newPosition.latitude, newPosition.longitude),
     );
 
-    return distance >= _minimumDistanceFilter;
+    bool shouldSend = distance >= _minimumDistanceFilter;
+    
+    if (shouldSend) {
+      print('📍 SAHAr Distance threshold met: ${distance.toStringAsFixed(1)}m - sending to server');
+    }
+    
+    return shouldSend;
+  }
+
+  /// Check if route should be updated (throttled to save API costs)
+  bool _shouldUpdateRoute(Position position) {
+    if (_lastRouteUpdatePosition == null || _lastRouteUpdateTime == null) {
+      return true; // First update
+    }
+
+    if (_locationService == null) return false;
+
+    // Check distance threshold (50 meters)
+    double distance = _locationService!.calculateDistance(
+      LatLng(_lastRouteUpdatePosition!.latitude, _lastRouteUpdatePosition!.longitude),
+      LatLng(position.latitude, position.longitude),
+    );
+
+    if (distance >= _routeUpdateDistanceThreshold) {
+      return true; // Driver moved >50m from last route update
+    }
+
+    // Check time threshold (45 seconds)
+    Duration timeSinceLastUpdate = DateTime.now().difference(_lastRouteUpdateTime!);
+    if (timeSinceLastUpdate >= _routeUpdateTimeThreshold) {
+      return true; // 45 seconds passed since last update
+    }
+
+    return false; // No update needed
   }
 
   /// Start location updates
   Future<void> _startLocationUpdates() async {
     if (isLocationSending.value) return;
 
-    const LocationSettings locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 5,
-    );
-
-    // iOS-specific settings to keep SignalR connection alive in background
-    // Note: For iOS, we use bestForNavigation accuracy which helps prevent suspension
-    // The critical setting pauseLocationUpdatesAutomatically: false must be configured
-    // at the native iOS level through CLLocationManager delegate
-    if (Platform.isIOS) {
-      // Use bestForNavigation accuracy for iOS to optimize for vehicle navigation
-      // This helps prevent iOS from suspending the app in background
-      const LocationSettings iosLocationSettings = LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 5,
-      );
-
-      _positionStream = Geolocator.getPositionStream(
-        locationSettings: iosLocationSettings,
-      ).listen(
-        (Position position) async {
-          if (_shouldSendLocationUpdate(position)) {
-            bool success = await sendLocationUpdate(position.latitude, position.longitude);
-            if (success) {
-              lastSentLocation.value = position;
-            }
-          }
-        },
-        onError: (error) => print('❌ SAHAr Position stream error: $error'),
-      );
-    } else {
-      // Android implementation
-      _positionStream = Geolocator.getPositionStream(
-        locationSettings: locationSettings,
-      ).listen(
-        (Position position) async {
-          if (_shouldSendLocationUpdate(position)) {
-            bool success = await sendLocationUpdate(position.latitude, position.longitude);
-            if (success) {
-              lastSentLocation.value = position;
-            }
-          }
-        },
-        onError: (error) => print('❌ SAHAr Position stream error: $error'),
-      );
+    if (_locationService == null) {
+      print('❌ SAHAr LocationService not available');
+      return;
     }
 
-    _locationTimer = Timer.periodic(
-      const Duration(seconds: _locationUpdateIntervalSeconds),
-          (timer) async {
-        try {
-          Position position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.bestForNavigation,
+    // Stream Setup
+    _positionStream = _locationService!.getLocationStream(
+      iOSPlatform: Platform.isIOS,
+    ).listen(
+      (Position position) async {
+        print('📍 SAHAr Location received: ${position.latitude}, ${position.longitude}');
+
+        // ---------------------------------------------------------
+        // 1. Server ko location bhejein (SignalR) - FIRST PRIORITY
+        // ---------------------------------------------------------
+        if (_shouldSendLocationUpdate(position)) {
+          bool success = await sendLocationUpdate(
+            position.latitude,
+            position.longitude,
           );
-          bool success = await sendLocationUpdate(position.latitude, position.longitude);
-          if (success) lastSentLocation.value = position;
-        } catch (e) {
-          print('❌ SAHAr Timer location error: $e');
+          if (success) {
+            lastSentLocation.value = position;
+            print('✅ SAHAr Location sent to server successfully');
+          } else {
+            print('❌ SAHAr Location send failed (buffered offline)');
+          }
+        }
+
+        // ---------------------------------------------------------
+        // 2. Update MapService for Animation & Rotation (Debounced)
+        // ---------------------------------------------------------
+        _debouncedMarkerUpdate(position);
+
+        // ---------------------------------------------------------
+        // 3. Route Update (Dynamic - Like Uber) ✅
+        // ---------------------------------------------------------
+        // Check karein ke ride chal rahi hai ya nahi
+        if (currentRide.value != null && !_isUpdatingRoute) {
+          // Update route every 10 seconds OR 50 meters (whichever comes first)
+          if (_shouldUpdateRoute(position)) {
+            // Prevent concurrent updates
+            if (_isUpdatingRoute) return;
+            _isUpdatingRoute = true;
+            
+            try {
+              // ✅ Driver ki CURRENT location (from taxi marker)
+              LatLng driverKiJaga = LatLng(position.latitude, position.longitude);
+              LatLng manzil; // Kahan jana hai
+              Color routeColor;
+
+              if (rideStatus.value == 'Waiting') {
+                // Agar passenger ko lene ja raha hai
+                manzil = LatLng(currentRide.value!.pickUpLat, currentRide.value!.pickUpLon);
+                routeColor = Colors.orange;
+              } else if (rideStatus.value == 'In-Progress') {
+                // ✅ Sirf NEXT stop tak route (first stop in list)
+                if (currentRide.value!.stops.isNotEmpty) {
+                  final nextStop = currentRide.value!.stops.first; // Next immediate stop
+                  manzil = LatLng(nextStop.latitude, nextStop.longitude);
+                } else {
+                  manzil = LatLng(currentRide.value!.dropoffLat, currentRide.value!.dropoffLon);
+                }
+                routeColor = MColor.primaryNavy;
+              } else {
+                // Ride status not active, skip route update
+                _isUpdatingRoute = false;
+                return;
+              }
+
+              print('🔄 SAHAr Fetching new route from taxi position to destination...');
+
+              // ✅ Direct route from CURRENT taxi position to next destination
+              // This creates fresh polyline every 10 seconds from taxi marker
+              // NOTE: useStraightLineOnError=false so that on API failure we keep
+              // the existing polyline (no sudden straight-line artifact).
+              final points = await GoogleDirectionsService.getRoutePoints(
+                origin: driverKiJaga,
+                destination: manzil,
+                // No waypoints - direct route only
+                useStraightLineOnError: false,
+              );
+
+              // ✅ CENTRALIZED: Remove old polyline and draw new one
+              _setPolyline(points, routeColor);
+
+              // Update throttling variables after successful route update
+              _lastRouteUpdateTime = DateTime.now();
+              _lastRouteUpdatePosition = driverKiJaga;
+
+              print('✅ SAHAr Route updated from taxi marker (${points.length} points)');
+              print('🔄 SAHAr Next update in 10 seconds or 50 meters');
+            } catch (e) {
+              print('❌ SAHAr Error updating route: $e');
+            } finally {
+              _isUpdatingRoute = false;
+            }
+          }
         }
       },
+      onError: (error) => print('❌ SAHAr Position stream error: $error'),
     );
 
     isLocationSending.value = true;
-
-    // Send initial location
-    try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: Platform.isIOS ? LocationAccuracy.bestForNavigation : LocationAccuracy.high,
-      );
-      bool success = await sendLocationUpdate(position.latitude, position.longitude);
-      if (success) lastSentLocation.value = position;
-    } catch (e) {
-      print('❌ SAHAr Initial location error: $e');
-    }
   }
 
   /// Stop location updates
   void _stopLocationUpdates() {
-    _locationTimer?.cancel();
-    _locationTimer = null;
     _positionStream?.cancel();
     _positionStream = null;
     isLocationSending.value = false;
@@ -1423,7 +1910,16 @@ class BackgroundTrackingService extends GetxService {
       }
 
       try {
-        await Permission.ignoreBatteryOptimizations.request();
+        var batteryStatus = await Permission.ignoreBatteryOptimizations.request();
+        if (batteryStatus.isDenied || batteryStatus.isPermanentlyDenied) {
+          Get.snackbar(
+            'Battery Optimization',
+            'Please allow battery optimization to keep the app running in background',
+            backgroundColor: Colors.orange.shade100,
+            colorText: Colors.orange.shade800,
+            duration: const Duration(seconds: 5),
+          );
+        }
       } catch (e) {
         print('⚠️ SAHAr Battery optimization permission not available');
       }
@@ -1435,6 +1931,32 @@ class BackgroundTrackingService extends GetxService {
     }
   }
 
+  /// Enable WakeLock to keep screen/CPU active
+  Future<void> _enableWakeLock() async {
+    try {
+      if (!_isWakeLockEnabled) {
+        await WakelockPlus.enable();
+        _isWakeLockEnabled = true;
+        print('✅ SAHAr WakeLock enabled');
+      }
+    } catch (e) {
+      print('❌ SAHAr Error enabling WakeLock: $e');
+    }
+  }
+
+  /// Disable WakeLock
+  Future<void> _disableWakeLock() async {
+    try {
+      if (_isWakeLockEnabled) {
+        await WakelockPlus.disable();
+        _isWakeLockEnabled = false;
+        print('✅ SAHAr WakeLock disabled');
+      }
+    } catch (e) {
+      print('❌ SAHAr Error disabling WakeLock: $e');
+    }
+  }
+
   /// Start background service
   Future<bool> startBackgroundService() async {
     if (isRunning.value) {
@@ -1443,7 +1965,14 @@ class BackgroundTrackingService extends GetxService {
     }
 
     try {
+      // Request location permissions via LocationService
+      if (_locationService != null) {
+        await _locationService!.requestBackgroundPermissions();
+      }
+
+      // Request notification and battery permissions
       await requestBackgroundPermissions();
+
       FlutterForegroundTask.init(
         androidNotificationOptions: AndroidNotificationOptions(
           channelId: 'pickurides_tracking',
@@ -1464,14 +1993,11 @@ class BackgroundTrackingService extends GetxService {
         ),
       );
 
-      // Connect to SignalR
-      bool connected = await _connect();
-      if (!connected) {
+      // Connect to SignalR and subscribe in a single idempotent flow
+      await _ensureConnectedAndSubscribed();
+      if (!isConnected.value) {
         throw Exception('Failed to connect to server');
       }
-
-      // Auto-subscribe with retry logic
-      await _autoSubscribe();
 
       // Start location updates
       await _startLocationUpdates();
@@ -1481,6 +2007,9 @@ class BackgroundTrackingService extends GetxService {
         notificationTitle: 'PickuRides',
         notificationText: "You're online and available for rides",
       );
+
+      // Enable WakeLock to keep app running
+      await _enableWakeLock();
 
       isRunning.value = true;
       print('✅ SAHAr Background service started');
@@ -1516,6 +2045,10 @@ class BackgroundTrackingService extends GetxService {
       connectionStatus.value = 'Disconnected';
 
       await FlutterForegroundTask.stopService();
+      
+      // Disable WakeLock
+      await _disableWakeLock();
+      
       isRunning.value = false;
 
       print('✅ SAHAr Background service stopped completely');
@@ -1565,8 +2098,18 @@ class BackgroundTrackingService extends GetxService {
     };
   }
 
+  /// Convenience helper for debugging: logs the current service info
+  /// in a single, structured line so it can be inspected easily from
+  /// the console or logcat while testing.
+  void debugPrintServiceInfo() {
+    final info = getServiceInfo();
+    print('🧩 SAHAr BackgroundTrackingService state: $info');
+  }
+
   @override
   void onClose() {
+    _markerUpdateDebounce?.cancel();
+    _connectivitySubscription?.cancel();
     stopBackgroundService();
     _stopReconnectionTimer();
     super.onClose();
@@ -1589,7 +2132,10 @@ class BackgroundTrackingService extends GetxService {
     }
 
     // Clear ride-related UI elements
-    routePolylines.clear();
+    // ✅ Clear route using MapService
+    if (Get.isRegistered<MapService>()) {
+      MapService.to.polylines.clear();
+    }
     rideMarkers.clear();
 
     // Reset ride widget state by clearing current ride temporarily
@@ -1615,4 +2161,55 @@ class BackgroundTrackingService extends GetxService {
       print('⚠️ SAHAr Could not play notification sound: $e');
     }
   }
+
+  /// ✅ CENTRALIZED FUNCTION: Sirf ye function route draw karega
+  /// All route drawing MUST go through this function to avoid duplicates
+  void _setPolyline(List<LatLng> points, Color color) {
+    if (points.isEmpty) {
+      print('⚠️ SAHAr _setPolyline: Empty points, skipping');
+      return;
+    }
+
+    if (!Get.isRegistered<MapService>()) {
+      print('⚠️ SAHAr MapService not registered, cannot draw route');
+      return;
+    }
+
+    // ✅ Use MapService as Single Source of Truth
+    MapService.to.updateRoutePolyline(points, color: color);
+    
+    print('✅ SAHAr Route Updated via Centralized Function (${points.length} points, color: $color)');
+  }
+
+  /// Debounced marker update to prevent excessive map rebuilds
+  void _debouncedMarkerUpdate(Position position) {
+    // Store the latest position
+    _pendingMarkerUpdate = position;
+
+    // Cancel previous timer
+    _markerUpdateDebounce?.cancel();
+
+    // Only update after 500ms of no new positions
+    _markerUpdateDebounce = Timer(const Duration(milliseconds: 500), () {
+      if (_pendingMarkerUpdate != null) {
+        try {
+          if (Get.isRegistered<MapService>()) {
+            // MapService handles the driver marker with animation & rotation
+            MapService.to.updateDriverMarker(
+              _pendingMarkerUpdate!.latitude,
+              _pendingMarkerUpdate!.longitude,
+            );
+            // Only print occasionally to reduce log spam
+            if (DateTime.now().millisecond % 10 == 0) {
+              print('🚗 SAHAr Driver marker updated via MapService (debounced)');
+            }
+          }
+        } catch (e) {
+          print('❌ SAHAr Error updating map service: $e');
+        }
+        _pendingMarkerUpdate = null;
+      }
+    });
+  }
+
 }

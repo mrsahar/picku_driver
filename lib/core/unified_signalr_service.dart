@@ -166,9 +166,28 @@ class UnifiedSignalRService extends GetxService {
     }
   }
 
-  /// Get driver info from DriverService
-  String? get _driverId => DriverService.to.driverId.value;
-  String? get _driverName => DriverService.to.driverName.value;
+  /// Get driver info from DriverService (safe access)
+  String? get _driverId {
+    try {
+      if (Get.isRegistered<DriverService>()) {
+        return DriverService.to.driverId.value;
+      }
+    } catch (e) {
+      print('⚠️ SAHAr Could not access DriverService: $e');
+    }
+    return null;
+  }
+
+  String? get _driverName {
+    try {
+      if (Get.isRegistered<DriverService>()) {
+        return DriverService.to.driverName.value;
+      }
+    } catch (e) {
+      print('⚠️ SAHAr Could not access DriverService: $e');
+    }
+    return null;
+  }
 
   /// Initialize SignalR connection with JWT authentication
   Future<void> _initializeConnection() async {
@@ -202,9 +221,33 @@ class UnifiedSignalRService extends GetxService {
     }
   }
 
+  /// Log raw SignalR event payloads for debugging.
+  void _logSignalrEvent(String eventName, List<Object?>? arguments) {
+    print('📥 SAHAr [SignalR] Event: $eventName');
+    if (arguments == null) {
+      print('📥 SAHAr [SignalR] $eventName arguments: null');
+      return;
+    }
+    if (arguments.isEmpty) {
+      print('📥 SAHAr [SignalR] $eventName arguments: []');
+      return;
+    }
+    print('📥 SAHAr [SignalR] $eventName arguments count: ${arguments.length}');
+    for (int i = 0; i < arguments.length; i++) {
+      final arg = arguments[i];
+      print('📥 SAHAr [SignalR] $eventName arg[$i] type: ${arg.runtimeType}');
+      print('📥 SAHAr [SignalR] $eventName arg[$i] value: $arg');
+    }
+  }
+
   /// Set up connection event handlers for all features
   void _setupConnectionHandlers() {
-    if (_hubConnection == null) return;
+    if (_hubConnection == null) {
+      print('❌ SAHAr [SignalR] Cannot setup handlers - _hubConnection is null');
+      return;
+    }
+
+    print('🔧 SAHAr [SignalR] Setting up connection handlers...');
 
     // ==================== Connection State Changes ====================
     _hubConnection!.onclose((error) {
@@ -245,6 +288,12 @@ class UnifiedSignalRService extends GetxService {
 
     // ==================== Location Tracking Events ====================
     _hubConnection!.on('RideAssigned', (List<Object?>? arguments) {
+      print('🚨🚨🚨 SAHAr [SignalR] >>>>>> RideAssigned TRIGGERED <<<<<<');
+      print('🚨 SAHAr [SignalR] RideAssigned RAW arguments: $arguments');
+      print('🚨 SAHAr [SignalR] RideAssigned arguments type: ${arguments.runtimeType}');
+      print('🚨 SAHAr [SignalR] RideAssigned arguments length: ${arguments?.length ?? 0}');
+
+      _logSignalrEvent('RideAssigned', arguments);
       print('📥 SAHAr [SignalR] RideAssigned event received');
       print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       if (arguments != null && arguments.isNotEmpty) {
@@ -260,6 +309,10 @@ class UnifiedSignalRService extends GetxService {
     });
 
     _hubConnection!.on('RideCompleted', (List<Object?>? arguments) {
+      print('🚨🚨🚨 SAHAr [SignalR] >>>>>> RideCompleted TRIGGERED <<<<<<');
+      print('🚨 SAHAr [SignalR] RideCompleted RAW arguments: $arguments');
+
+      _logSignalrEvent('RideCompleted', arguments);
       print('📥 SAHAr [SignalR] RideCompleted event received');
       print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       if (arguments != null && arguments.isNotEmpty) {
@@ -280,6 +333,7 @@ class UnifiedSignalRService extends GetxService {
     });
 
     _hubConnection!.on('LocationReceived', (List<Object?>? arguments) {
+      _logSignalrEvent('LocationReceived', arguments);
       print('📥 SAHAr [SignalR] LocationReceived event received');
       print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       print('📍 SAHAr Location update acknowledged by server');
@@ -287,6 +341,7 @@ class UnifiedSignalRService extends GetxService {
     });
 
     _hubConnection!.on('DriverStatusChanged', (List<Object?>? arguments) {
+      _logSignalrEvent('DriverStatusChanged', arguments);
       print('📥 SAHAr [SignalR] DriverStatusChanged event received');
       print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       if (arguments != null && arguments.length >= 2) {
@@ -307,25 +362,39 @@ class UnifiedSignalRService extends GetxService {
     });
 
     _hubConnection!.on('RideStatusUpdate', (List<Object?>? arguments) {
-       print('📥 SAHAr [SignalR] RideStatusUpdate event received');
-       if (arguments != null && arguments.isNotEmpty) {
-         try {
-           final statusUpdate = arguments[0] as Map<String, dynamic>;
-           // Update reactive variables
-           // Assuming statusUpdate has 'status' and 'rideId'
-           if (statusUpdate.containsKey('status')) {
-             rideStatus.value = statusUpdate['status'];
-           }
-           // TODO: Update currentRide object if needed
-           print('✅ SAHAr Status updated: ${rideStatus.value}');
-         } catch (e) {
-           print('❌ SAHAr Error parsing RideStatusUpdate: $e');
-         }
-       }
+      print('🚨🚨🚨 SAHAr [SignalR] >>>>>> RideStatusUpdate TRIGGERED <<<<<<');
+      print('🚨 SAHAr [SignalR] RideStatusUpdate RAW arguments: $arguments');
+      print('🚨 SAHAr [SignalR] RideStatusUpdate arguments type: ${arguments.runtimeType}');
+      print('🚨 SAHAr [SignalR] RideStatusUpdate arguments length: ${arguments?.length ?? 0}');
+      if (arguments != null && arguments.isNotEmpty) {
+        print('🚨 SAHAr [SignalR] RideStatusUpdate arg[0] type: ${arguments[0].runtimeType}');
+        print('🚨 SAHAr [SignalR] RideStatusUpdate arg[0] value: ${arguments[0]}');
+      }
+
+      _logSignalrEvent('RideStatusUpdate', arguments);
+      print('📥 SAHAr [SignalR] RideStatusUpdate event received');
+      if (arguments != null && arguments.isNotEmpty) {
+        try {
+          final statusUpdate = arguments[0] as Map<String, dynamic>;
+          // Update reactive variables
+          // Assuming statusUpdate has 'status' and 'rideId'
+          if (statusUpdate.containsKey('status')) {
+            rideStatus.value = statusUpdate['status'];
+          }
+          // TODO: Update currentRide object if needed
+          print('✅ SAHAr Status updated: ${rideStatus.value}');
+        } catch (e) {
+          print('❌ SAHAr Error parsing RideStatusUpdate: $e');
+        }
+      }
     });
 
     // ==================== Ride Chat Events ====================
     _hubConnection!.on('ReceiveMessage', (List<Object?>? arguments) {
+      print('🚨🚨🚨 SAHAr [SignalR] >>>>>> ReceiveMessage TRIGGERED <<<<<<');
+      print('🚨 SAHAr [SignalR] ReceiveMessage RAW arguments: $arguments');
+
+      _logSignalrEvent('ReceiveMessage', arguments);
       print('📥 SAHAr [SignalR] ReceiveMessage event received');
       print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       if (arguments != null && arguments.isNotEmpty) {
@@ -347,6 +416,7 @@ class UnifiedSignalRService extends GetxService {
     });
 
     _hubConnection!.on('ReceiveRideChatHistory', (List<Object?>? arguments) {
+      _logSignalrEvent('ReceiveRideChatHistory', arguments);
       print('📥 SAHAr [SignalR] ReceiveRideChatHistory event received');
       print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       print('📜 SAHAr ReceiveRideChatHistory event triggered');
@@ -370,6 +440,7 @@ class UnifiedSignalRService extends GetxService {
 
     // ==================== Driver-Admin Chat Events ====================
     _hubConnection!.on('ReceiveDriverAdminMessage', (List<Object?>? arguments) {
+      _logSignalrEvent('ReceiveDriverAdminMessage', arguments);
       print('📥 SAHAr [SignalR] ReceiveDriverAdminMessage event received');
       print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       if (arguments != null && arguments.isNotEmpty) {
@@ -391,6 +462,7 @@ class UnifiedSignalRService extends GetxService {
     });
 
     _hubConnection!.on('ReceiveDriverAdminChatHistory', (List<Object?>? arguments) {
+      _logSignalrEvent('ReceiveDriverAdminChatHistory', arguments);
       print('📥 SAHAr [SignalR] ReceiveDriverAdminChatHistory event received');
       print('📥 SAHAr [SignalR] Raw arguments: $arguments');
       if (arguments != null && arguments.isNotEmpty) {
@@ -410,26 +482,48 @@ class UnifiedSignalRService extends GetxService {
         print('⚠️ SAHAr [SignalR] ReceiveDriverAdminChatHistory: arguments is null or empty');
       }
     });
+
+    print('✅✅✅ SAHAr [SignalR] ALL HANDLERS REGISTERED SUCCESSFULLY ✅✅✅');
+    print('✅ SAHAr [SignalR] Listening for:');
+    print('   - RideAssigned');
+    print('   - RideCompleted');
+    print('   - LocationReceived');
+    print('   - DriverStatusChanged');
+    print('   - RideStatusUpdate');
+    print('   - ReceiveMessage');
+    print('   - ReceiveRideChatHistory');
+    print('   - ReceiveDriverAdminMessage');
+    print('   - ReceiveDriverAdminChatHistory');
   }
 
   // ==================== Connection Management ====================
 
   /// Connect to SignalR hub
   Future<bool> connect() async {
+    print('🔌 SAHAr [SignalR] connect() called');
+
     if (_hubConnection == null) {
+      print('⚠️ SAHAr [SignalR] _hubConnection is null, initializing...');
       await _initializeConnection();
-      if (_hubConnection == null) return false;
+      if (_hubConnection == null) {
+        print('❌ SAHAr [SignalR] Failed to initialize connection');
+        return false;
+      }
     }
 
     try {
+      print('🔌 SAHAr [SignalR] Attempting to start connection...');
       connectionStatus.value = 'Connecting...';
       await _hubConnection!.start();
       isConnected.value = true;
       connectionStatus.value = 'Connected';
       print('✅ SAHAr Successfully connected to SignalR hub');
+      print('✅ SAHAr [SignalR] Connection state: ${_hubConnection!.state}');
+      print('✅ SAHAr [SignalR] Connection ID: ${_hubConnection!.connectionId}');
       return true;
     } catch (e) {
       print('❌ SAHAr Failed to connect to SignalR: $e');
+      print('❌ SAHAr [SignalR] Stack trace: ${StackTrace.current}');
       isConnected.value = false;
       connectionStatus.value = 'Connection failed: $e';
       return false;
@@ -1067,6 +1161,8 @@ class UnifiedSignalRService extends GetxService {
     super.onClose();
   }
 }
+
+
 
 
 

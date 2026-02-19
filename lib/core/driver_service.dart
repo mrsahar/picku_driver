@@ -7,11 +7,13 @@ class DriverService extends GetxService {
   // Reactive variables
   var driverId = RxnString();
   var driverName = RxnString();
+  var rideStatus = RxnString();
   var isLoggedIn = false.obs;
 
   // SharedPreferences keys
   static const String _driverIdKey = 'driver_id';
   static const String _driverNameKey = 'driver_name';
+  static const String _rideStatusKey = 'ride_status';
   static const String _isLoggedInKey = 'is_logged_in';
 
   @override
@@ -27,9 +29,10 @@ class DriverService extends GetxService {
 
       driverId.value = prefs.getString(_driverIdKey);
       driverName.value = prefs.getString(_driverNameKey);
+      rideStatus.value = prefs.getString(_rideStatusKey);
       isLoggedIn.value = prefs.getBool(_isLoggedInKey) ?? false;
 
-      print(' SAHAr Driver data loaded: ID=${driverId.value}, Name=${driverName.value}');
+      print(' SAHAr Driver data loaded: ID=${driverId.value}, Name=${driverName.value}, RideStatus=${rideStatus.value}');
     } catch (e) {
       print(' SAHAr Error loading driver data: $e');
     }
@@ -39,6 +42,7 @@ class DriverService extends GetxService {
   Future<bool> saveDriverLogin({
     required String id,
     required String name,
+    String? rideStatus,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -47,12 +51,17 @@ class DriverService extends GetxService {
       await prefs.setString(_driverNameKey, name);
       await prefs.setBool(_isLoggedInKey, true);
 
+      if (rideStatus != null) {
+        await prefs.setString(_rideStatusKey, rideStatus);
+      }
+
       // Update reactive variables
       driverId.value = id;
       driverName.value = name;
+      this.rideStatus.value = rideStatus;
       isLoggedIn.value = true;
 
-      print(' SAHAr Driver login saved: ID=$id, Name=$name');
+      print(' SAHAr Driver login saved: ID=$id, Name=$name, RideStatus=$rideStatus');
       return true;
     } catch (e) {
       print(' SAHAr Error saving driver login: $e');
@@ -67,11 +76,13 @@ class DriverService extends GetxService {
 
       await prefs.remove(_driverIdKey);
       await prefs.remove(_driverNameKey);
+      await prefs.remove(_rideStatusKey);
       await prefs.setBool(_isLoggedInKey, false);
 
       // Clear reactive variables
       driverId.value = null;
       driverName.value = null;
+      rideStatus.value = null;
       isLoggedIn.value = false;
 
       print(' SAHAr Driver data cleared');
@@ -100,6 +111,21 @@ class DriverService extends GetxService {
       return true;
     } catch (e) {
       print(' SAHAr Error updating driver name: $e');
+      return false;
+    }
+  }
+
+  // Update ride status only
+  Future<bool> updateRideStatus(String status) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_rideStatusKey, status);
+
+      rideStatus.value = status;
+      print(' SAHAr Ride status updated: $status');
+      return true;
+    } catch (e) {
+      print(' SAHAr Error updating ride status: $e');
       return false;
     }
   }

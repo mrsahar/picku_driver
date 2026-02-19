@@ -71,37 +71,13 @@ class EarningsPage extends GetView<EarningsController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- Top Row (Paid & Pending) ---
-          Row(
-            children: [
-              Expanded(
-                child: _buildSummaryCard(
-                  title: 'Paid',
-                  amount: controller.formatCurrency(data.paidAmount),
-                  highlight: true,
-                  icon: Icons.check_circle_rounded,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildSummaryCard(
-                  title: 'Pending',
-                  amount: controller.formatCurrency(data.pendingPayment),
-                  highlight: true,
-                  icon: Icons.pending_actions_rounded,
-                ),
-              ),
-            ],
-          ),
 
-          const SizedBox(height: 12),
-
-          // --- Bottom Row (Total Earnings & Trips) ---
           Row(
             children: [
               Expanded(
                 child: _buildSummaryCard(
                   title: 'Total Earned',
+                  highlight: true,
                   amount: controller.formatCurrency(data.totalPayment),
                   icon: Icons.account_balance_wallet_rounded,
                 ),
@@ -267,7 +243,7 @@ class EarningsPage extends GetView<EarningsController> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    controller.formatCurrency(payment.driverShare),
+                    controller.formatCurrency(payment.driverShare + payment.tipAmount),
                     style: TextStyle(
                       color: MColor.primaryNavy,
                       fontSize: 18,
@@ -282,6 +258,24 @@ class EarningsPage extends GetView<EarningsController> {
                       fontSize: 12,
                     ),
                   ),
+                  if (payment.tipAmount > 0) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Tip: ${controller.formatCurrency(payment.tipAmount)}',
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -371,7 +365,7 @@ class EarningsPage extends GetView<EarningsController> {
                       child: Column(
                         children: [
                           Text(
-                            'Driver Share',
+                            'Total Amount',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.8),
                               fontSize: 13,
@@ -380,7 +374,7 @@ class EarningsPage extends GetView<EarningsController> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            controller.formatCurrency(payment.driverShare),
+                            controller.formatCurrency(payment.driverShare + payment.tipAmount),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 32,
@@ -434,9 +428,9 @@ class EarningsPage extends GetView<EarningsController> {
                     ),
                     const SizedBox(height: 16),
 
-                    _buildAmountRow('Paid Amount', controller.formatCurrency(payment.paidAmount)),
-                    _buildAmountRow('Tip Amount', controller.formatCurrency(payment.tipAmount)),
-                    _buildAmountRow('Admin Share', controller.formatCurrency(payment.adminShare)),
+                    _buildAmountRow('Driver Share', controller.formatCurrency(payment.driverShare)),
+                    if (payment.tipAmount > 0)
+                      _buildAmountRow('Tip Amount', controller.formatCurrency(payment.tipAmount)),
 
                     const SizedBox(height: 12),
                     Container(
@@ -457,7 +451,7 @@ class EarningsPage extends GetView<EarningsController> {
                             ),
                           ),
                           Text(
-                            controller.formatCurrency(payment.paidAmount + payment.tipAmount),
+                            controller.formatCurrency(payment.driverShare + payment.tipAmount),
                             style: TextStyle(
                               color: MColor.primaryNavy,
                               fontSize: 18,

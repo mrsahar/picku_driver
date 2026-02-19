@@ -67,7 +67,7 @@ class ScheduledRideItem {
   final String status;
   final double distance;
   final double? adminCommission;
-  final String? driverPayment;
+  final double? driverPayment;
   final String? pickupLocation;
   final String? dropoffLocation;
   final String? totalWaitingTime;
@@ -117,7 +117,9 @@ class ScheduledRideItem {
       status: json['status'] ?? '',
       distance: (json['distance'] ?? 0.0).toDouble(),
       adminCommission: json['adminCommission']?.toDouble(),
-      driverPayment: json['driverPayment'],
+      driverPayment: json['driverPayment'] != null 
+          ? double.tryParse(json['driverPayment'].toString()) 
+          : null,
       pickupLocation: json['pickupLocation'],
       dropoffLocation: json['dropoffLocation'],
       totalWaitingTime: json['totalWaitingTime'],
@@ -130,7 +132,6 @@ class ScheduledRideItem {
     );
   }
 
-  // Helper methods to get pickup and dropoff locations from rideStops
   String get actualPickupLocation {
     if (pickupLocation != null && pickupLocation!.isNotEmpty) {
       return pickupLocation!;
@@ -183,16 +184,15 @@ class ScheduledRideItem {
     return parts.length > 2 ? '${parts[0]}, ${parts[1]}...' : location;
   }
 
-  // For sorting - pending rides with latest scheduled time first
   int compareTo(ScheduledRideItem other) {
     if (status.toLowerCase() == 'pending' && other.status.toLowerCase() == 'pending') {
-      return other.scheduledTime.compareTo(scheduledTime); // Latest first
+      return other.scheduledTime.compareTo(scheduledTime);
     } else if (status.toLowerCase() == 'pending') {
-      return -1; // Pending rides come first
+      return -1;
     } else if (other.status.toLowerCase() == 'pending') {
-      return 1; // Other ride goes after pending
+      return 1;
     } else {
-      return other.createdAt.compareTo(createdAt); // Latest created first for non-pending
+      return other.createdAt.compareTo(createdAt);
     }
   }
 }

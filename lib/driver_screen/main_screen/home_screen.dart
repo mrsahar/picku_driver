@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:pick_u_driver/controllers/ride_controller.dart';
+import 'package:pick_u_driver/controllers/ride_status_controller.dart';
 import 'package:pick_u_driver/core/background_tracking_service.dart';
 import 'package:pick_u_driver/controllers/driver_status_controller.dart';
 import 'package:pick_u_driver/core/location_service.dart';
@@ -35,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final ChatNotificationService _notificationService = ChatNotificationService.to;
   final RideNotificationService _rideNotificationService = RideNotificationService.to;
   late DriverStatusController _driverStatusController;
+  RideStatusController? _rideStatusController;
 
   // Map and UI state
   static const CameraPosition _kGooglePlex = CameraPosition(
@@ -49,8 +51,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // Track if initial location has been set
   bool _hasInitialLocationBeenSet = false;
 
-  // Location stream subscription for continuous updates
-  StreamSubscription<Position>? _locationStreamSubscription;
+  // ✅ REMOVED: Redundant location stream subscription
+  // Location updates are now handled centrally by BackgroundTrackingService
+  // StreamSubscription<Position>? _locationStreamSubscription;
 
   @override
   void initState() {
@@ -60,8 +63,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _locationStreamSubscription?.cancel();
+    // ✅ Removed: _locationStreamSubscription?.cancel();
     _driverStatusController.dispose();
+    _rideStatusController?.dispose();
     super.dispose();
   }
 
@@ -118,6 +122,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _initializeControllers() async {
     try {
       _driverStatusController = Get.put(DriverStatusController());
+      _rideStatusController = Get.put(RideStatusController());
+      Get.put(RideController()); // ✅ Moved from build method to avoid re-initialization
       await Future.delayed(const Duration(seconds: 1));
       print('✅ SAHAr Controllers initialized');
     } catch (e) {
@@ -149,7 +155,8 @@ class _HomeScreenState extends State<HomeScreen> {
           print('✅ SAHAr First location set and map centered');
         }
 
-        if (mounted) setState(() {});
+        // ✅ REMOVED: setState() - Not needed with GetX observables
+        // GetX automatically rebuilds widgets wrapped in Obx() when observables change
       }
     } catch (e) {
       print('❌ SAHAr Error showing current location: $e');
@@ -158,18 +165,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Setup location listener for continuous updates
   void _setupLocationListener() {
-    // Start continuous location stream
-    _locationStreamSubscription = _locationService.getLocationStream().listen(
-      (Position position) {
-        final newLocation = LatLng(position.latitude, position.longitude);
-        print('📍 HomeScreen: Location stream update: $newLocation');
+    // ✅ OPTIMIZATION: React to LocationService observables instead of creating another stream
+    // BackgroundTrackingService handles the actual location stream
+    // We just react to the changes here for UI updates
 
-        // Update marker via MapService
-        _mapService.updateDriverMarker(
-          position.latitude,
-          position.longitude,
-        );
-
+    ever(_locationService.currentLatLng, (LatLng? newLocation) {
+      if (newLocation != null) {
         // Update stored location
         _userLocation = newLocation;
 
@@ -177,30 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!_hasInitialLocationBeenSet) {
           _centerMapToLocation(newLocation, zoom: 17.0);
           _hasInitialLocationBeenSet = true;
-          print('✅ HomeScreen: First location set via stream');
-        }
-      },
-      onError: (error) {
-        print('❌ HomeScreen: Location stream error: $error');
-      },
-    );
-
-    // Also listen to GetX observable for backwards compatibility
-    ever(_locationService.currentLatLng, (LatLng? newLocation) {
-      if (newLocation != null) {
-        print('📍 SAHAr Location updated via GetX: $newLocation');
-
-        _mapService.updateDriverMarker(
-          newLocation.latitude,
-          newLocation.longitude,
-        );
-
-        _userLocation = newLocation;
-
-        if (!_hasInitialLocationBeenSet) {
-          _centerMapToLocation(newLocation, zoom: 17.0);
-          _hasInitialLocationBeenSet = true;
-          print('✅ SAHAr First location set via GetX listener');
+          print('✅ HomeScreen: First location set and map centered');
         }
       }
     });
@@ -208,11 +186,6 @@ class _HomeScreenState extends State<HomeScreen> {
     // Check if location is already available
     if (_locationService.currentLatLng.value != null && !_hasInitialLocationBeenSet) {
       LatLng currentLocation = _locationService.currentLatLng.value!;
-
-      _mapService.updateDriverMarker(
-        currentLocation.latitude,
-        currentLocation.longitude,
-      );
 
       _userLocation = currentLocation;
       _centerMapToLocation(currentLocation, zoom: 17.0);
@@ -231,6 +204,9 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Check if camera moved away from user location
   void _onCameraMove(CameraPosition position) {
     if (_userLocation == null) return;
+
+    // ✅ Notify MapService that user has panned the camera
+    _mapService.onUserCameraMove();
 
     // Calculate distance between camera target and user location
     double distance = _calculateDistance(
@@ -260,6 +236,21 @@ class _HomeScreenState extends State<HomeScreen> {
     double dLat = (lat2 - lat1).abs();
     double dLon = (lon2 - lon1).abs();
     return dLat + dLon;
+  }
+
+  /// Get combined markers reactively
+  /// ✅ OPTIMIZATION: This method is called by GoogleMap, and GetX will automatically
+  /// track the observables accessed here, updating only when they change
+  Set<Marker> _getCombinedMarkers() {
+    final mapServiceMarkers = _mapService.markers;
+    final rideMarkers = _backgroundService.rideMarkers;
+    return {...mapServiceMarkers, ...rideMarkers};
+  }
+
+  /// Get polylines reactively
+  /// ✅ OPTIMIZATION: Same as markers - GetX tracks changes automatically
+  Set<Polyline> _getPolylines() {
+    return _mapService.polylines;
   }
 
   /// Center map to user location with zoom animation
@@ -295,9 +286,161 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Build ride status widget with proper Obx usage
+  Widget _buildRideStatusWidget() {
+    return Obx(() {
+      final controller = _rideStatusController;
+      if (controller == null) {
+        return const SizedBox.shrink();
+      }
+
+      final status = controller.rideStatus.value;
+      final shouldShowGoLive = controller.shouldShowGoLiveButton.value; // Use .value since it's now an observable
+
+      // Debug logging
+      print('🔍 SAHAr Ride Status Widget - Status: "$status", ShowGoLive: $shouldShowGoLive');
+
+      // If nothing to show, return empty widget
+      if ((status == null || status.isEmpty) && !shouldShowGoLive) {
+        print('⚠️ SAHAr Nothing to show - status is empty and shouldShowGoLive is false');
+        return const SizedBox.shrink();
+      }
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Ride Status Badge (only if status exists)
+            if (status != null && status.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: status.toLowerCase() == 'available'
+                      ? Colors.green.shade100
+                      : Colors.orange.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: status.toLowerCase() == 'available'
+                        ? Colors.green.shade300
+                        : Colors.orange.shade300,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: status.toLowerCase() == 'available'
+                            ? Colors.green
+                            : Colors.orange,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      status,
+                      style: TextStyle(
+                        color: status.toLowerCase() == 'available'
+                            ? Colors.green.shade900
+                            : Colors.orange.shade900,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Spacing between badge and button (only if both exist)
+            if (status != null && status.isNotEmpty && shouldShowGoLive)
+              const SizedBox(width: 8),
+
+            // Go Live Button (show independently if needed)
+            if (shouldShowGoLive)
+              _buildGoLiveButton(controller),
+          ],
+        ),
+      );
+    });
+  }
+
+  /// Build Go Live button with separate Obx for loading state
+  Widget _buildGoLiveButton(RideStatusController controller) {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: () {
+          if (!controller.isLoading.value) {
+            controller.goLive();
+          }
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF4CAF50), Color(0xFF45a049)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Obx(() {
+            final isLoading = controller.isLoading.value;
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isLoading)
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                else
+                  const Icon(
+                    Icons.play_arrow,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                const SizedBox(width: 6),
+                const Text(
+                  'GO LIVE',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    Get.put(RideController());
     return Scaffold(
       body: _buildMainInterface(context),
     );
@@ -311,41 +454,69 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Stack(
       children: [
-        // Google Map - Wrapped in RepaintBoundary to reduce rebuilds
-        Obx(
-              () {
-            // Force reactivity by accessing the observable values
-            final mapServiceMarkers = _mapService.markers.toSet();
-            final rideMarkers = _backgroundService.rideMarkers.toSet();
-            // ✅ Use MapService.polylines as Single Source of Truth
-            final routePolylines = _mapService.polylines.toSet();
+        // Google Map - Optimized to avoid full rebuilds
+        // ✅ SUPER OPTIMIZATION: Separate Obx for markers and polylines
+        // This prevents rebuild when other observables change
+        RepaintBoundary(
+          child: Obx(() {
+            // ✅ GetX will only rebuild this when markers or polylines change
+            final combinedMarkers = _getCombinedMarkers();
+            final polylines = _getPolylines();
 
-            // ✅ Reduced logging - only log occasionally to reduce spam
-            if (DateTime.now().millisecond % 50 == 0) {
-              print('🗺️ HomeScreen: Rebuilding map - MapService markers: ${mapServiceMarkers.length}, Ride markers: ${rideMarkers.length}, Polylines: ${routePolylines.length}');
+            return GoogleMap(
+              mapType: MapType.normal,
+              style: (isDarkMode) ? darkMapTheme : lightMapTheme,
+              initialCameraPosition: _kGooglePlex,
+              myLocationButtonEnabled: false,
+              myLocationEnabled: false,
+              zoomControlsEnabled: false,
+              markers: combinedMarkers,
+              polylines: polylines,
+              onMapCreated: (GoogleMapController controller) {
+                _mapService.setMapController(controller);
+                print('✅ SAHAr Map controller set');
+              },
+              onCameraMove: _onCameraMove,
+            );
+          }),
+        ),
+
+        // ✅ Status Bar Color Indicator (Uber-like top bar that changes color)
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Obx(() {
+            final rideStatus = _backgroundService.rideStatus.value;
+            final isOnline = rideStatus.toLowerCase() == 'online';
+
+            // Show colored bar only when Online
+            if (!isOnline) {
+              return const SizedBox.shrink();
             }
 
-             return RepaintBoundary(
-               child: GoogleMap(
-                 mapType: MapType.normal,
-                 style: (isDarkMode) ? darkMapTheme : lightMapTheme,
-                 initialCameraPosition: _kGooglePlex,
-                 myLocationButtonEnabled: false,
-                 myLocationEnabled: false,
-                 zoomControlsEnabled: false,
-                 markers: {
-                   ...mapServiceMarkers,
-                   ...rideMarkers,
-                 },
-                 polylines: routePolylines,
-                 onMapCreated: (GoogleMapController controller) {
-                   _mapService.setMapController(controller);
-                   print('✅ SAHAr Map controller set');
-                 },
-                 onCameraMove: _onCameraMove,
-               ),
-             );
-          },
+            return Container(
+              height: 3,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.green.shade400,
+                    Colors.green.shade600,
+                    Colors.green.shade400,
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withValues(alpha: 0.3),
+                    blurRadius: 4,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+            );
+          }),
         ),
 
         // Center to Marker Button

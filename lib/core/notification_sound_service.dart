@@ -5,7 +5,7 @@ import 'package:get/get.dart';
 class NotificationSoundService extends GetxService {
   static NotificationSoundService get to => Get.find();
 
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  AudioPlayer? _audioPlayer;
   bool _isInitialized = false;
 
   @override
@@ -17,24 +17,33 @@ class NotificationSoundService extends GetxService {
   /// Initialize the audio player
   Future<void> _initialize() async {
     try {
+      _audioPlayer = AudioPlayer();
       // Set release mode to release the player after playing
-      await _audioPlayer.setReleaseMode(ReleaseMode.release);
+      await _audioPlayer!.setReleaseMode(ReleaseMode.release);
       _isInitialized = true;
       print('🔔 SAHAr Notification sound service initialized');
     } catch (e) {
       print('❌ SAHAr Error initializing sound service: $e');
+      _isInitialized = false;
     }
   }
 
-  /// Play notification sound
+  /// Play notification sound for chat messages
   Future<void> playNotificationSound() async {
-    if (!_isInitialized) {
+    if (!_isInitialized || _audioPlayer == null) {
       await _initialize();
     }
 
+    if (_audioPlayer == null) {
+      print('⚠️ SAHAr Audio player not available, skipping sound');
+      return;
+    }
+
     try {
+      // Stop any currently playing sound first
+      await _audioPlayer!.stop();
       // Play the notification sound from assets
-      await _audioPlayer.play(AssetSource('sounds/notification.mp3'));
+      await _audioPlayer!.play(AssetSource('sounds/notification.mp3'));
       print('🔔 SAHAr Notification sound played');
     } catch (e) {
       print('❌ SAHAr Error playing notification sound: $e');
@@ -43,7 +52,8 @@ class NotificationSoundService extends GetxService {
 
   @override
   void onClose() {
-    _audioPlayer.dispose();
+    _audioPlayer?.dispose();
+    _audioPlayer = null;
     super.onClose();
   }
 }

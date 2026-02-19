@@ -9,6 +9,8 @@ class SharedPrefsService {
   static const String _keyUserFullName = 'user_full_name';
   static const String _keyIsLoggedIn = 'is_logged_in';
   static const String _keyStripeAccountId = 'driver_stripe_account_id';
+  static const String _keyRideStatus = 'ride_status';
+  static const String _keyApprovalStatus = 'approval_status';
 
   // Save user login data
   static Future<void> saveUserData({
@@ -17,6 +19,7 @@ class SharedPrefsService {
     required String userId,
     required String email,
     required String fullName,
+    String? rideStatus,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -27,6 +30,10 @@ class SharedPrefsService {
       await prefs.setString(_keyUserEmail, email);
       await prefs.setString(_keyUserFullName, fullName);
       await prefs.setBool(_keyIsLoggedIn, true);
+
+      if (rideStatus != null) {
+        await prefs.setString(_keyRideStatus, rideStatus);
+      }
 
       print(' SAHAr 💾 All user data saved to SharedPreferences successfully');
     } catch (e) {
@@ -62,6 +69,16 @@ class SharedPrefsService {
       if (data['stripeAccountId'] != null) {
         await prefs.setString(_keyStripeAccountId, data['stripeAccountId']);
         print(' SAHAr 💾 Stripe Account ID saved: ${data['stripeAccountId']}');
+      }
+
+      if (data['approvalStatus'] != null) {
+        await prefs.setString(_keyApprovalStatus, data['approvalStatus']);
+        print(' SAHAr 💾 Approval Status saved: ${data['approvalStatus']}');
+      }
+
+      if (data['rideStatus'] != null) {
+        await prefs.setString(_keyRideStatus, data['rideStatus']);
+        print(' SAHAr 💾 Ride Status saved: ${data['rideStatus']}');
       }
 
       await prefs.setBool(_keyIsLoggedIn, true);
@@ -128,6 +145,17 @@ class SharedPrefsService {
     }
   }
 
+  // Get ride status
+  static Future<String?> getRideStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_keyRideStatus);
+    } catch (e) {
+      print(' SAHAr 💥 Error getting ride status: $e');
+      return null;
+    }
+  }
+
   // Get user first name
   static Future<String?> getUserFirstName() async {
     try {
@@ -175,6 +203,8 @@ class SharedPrefsService {
         'email': prefs.getString(_keyUserEmail),
         'fullName': prefs.getString(_keyUserFullName),
         'stripeAccountId': prefs.getString(_keyStripeAccountId),
+        'approvalStatus': prefs.getString(_keyApprovalStatus),
+        'rideStatus': prefs.getString(_keyRideStatus),
         'isLoggedIn': prefs.getBool(_keyIsLoggedIn)?.toString(),
       };
     } catch (e) {
@@ -249,6 +279,17 @@ class SharedPrefsService {
     print(' SAHAr 🗑️ Stripe Account ID cleared - ready for fresh onboarding');
   }
 
+  // Update ride status only
+  static Future<void> updateRideStatus(String status) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyRideStatus, status);
+      print(' SAHAr 💾 Ride Status updated: $status');
+    } catch (e) {
+      print(' SAHAr 💥 Error updating ride status: $e');
+    }
+  }
+
   // Clear all user data (for logout)
   static Future<void> clearUserData() async {
     try {
@@ -260,6 +301,8 @@ class SharedPrefsService {
       await prefs.remove(_keyUserEmail);
       await prefs.remove(_keyUserFullName);
       await prefs.remove(_keyStripeAccountId);
+      await prefs.remove(_keyApprovalStatus);
+      await prefs.remove(_keyRideStatus);
       await prefs.setBool(_keyIsLoggedIn, false);
 
       print(' SAHAr 💾 User data cleared from SharedPreferences');

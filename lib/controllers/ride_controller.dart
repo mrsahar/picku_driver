@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:pick_u_driver/core/background_tracking_service.dart';
+import 'package:pick_u_driver/models/ride_assignment_model.dart';
 import 'package:pick_u_driver/providers/api_provider.dart';
 import 'package:pick_u_driver/utils/theme/mcolors.dart';
 
@@ -12,6 +15,8 @@ class RideController extends GetxController {
   var currentTimerSeconds = 0.obs;
   var totalWaitingTimeSeconds = 0.obs;
   var isProcessingRequest = false.obs;
+  var isArriving = false.obs;
+  var isStartingRide = false.obs;
 
   Timer? _timer;
 
@@ -169,6 +174,176 @@ class RideController extends GetxController {
       await resumeRide(rideId);
     } else {
       await requestStop(rideId);
+    }
+  }
+
+  // Mark driver as arrived at pickup location
+  Future<void> markAsArrived(String rideId) async {
+    if (isArriving.value) return;
+
+    try {
+      isArriving.value = true;
+
+      String endpoint = "/api/Ride/$rideId/arrived";
+      print("SAHAr - MarkAsArrived: Endpoint => $endpoint");
+
+      final response = await _apiProvider.postData(endpoint, {});
+      print("SAHAr - MarkAsArrived: Response => ${response.statusCode} ${response.statusText}");
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Trigger haptic feedback
+        HapticFeedback.mediumImpact();
+
+        print("SAHAr - MarkAsArrived: Successfully marked as arrived");
+
+        // ✅ Immediately update local ride status to "Arrived"
+        try {
+          final backgroundService = Get.find<BackgroundTrackingService>();
+          if (backgroundService.currentRide.value != null) {
+            final updatedRide = RideAssignment(
+              rideId: backgroundService.currentRide.value!.rideId,
+              rideType: backgroundService.currentRide.value!.rideType,
+              fareEstimate: backgroundService.currentRide.value!.fareEstimate,
+              fareFinal: backgroundService.currentRide.value!.fareFinal,
+              createdAt: backgroundService.currentRide.value!.createdAt,
+              status: 'Arrived', // ✅ Update status
+              passengerId: backgroundService.currentRide.value!.passengerId,
+              passengerName: backgroundService.currentRide.value!.passengerName,
+              passengerPhone: backgroundService.currentRide.value!.passengerPhone,
+              pickupLocation: backgroundService.currentRide.value!.pickupLocation,
+              pickUpLat: backgroundService.currentRide.value!.pickUpLat,
+              pickUpLon: backgroundService.currentRide.value!.pickUpLon,
+              dropoffLocation: backgroundService.currentRide.value!.dropoffLocation,
+              dropoffLat: backgroundService.currentRide.value!.dropoffLat,
+              dropoffLon: backgroundService.currentRide.value!.dropoffLon,
+              stops: backgroundService.currentRide.value!.stops,
+              passengerCount: backgroundService.currentRide.value!.passengerCount,
+              payment: backgroundService.currentRide.value!.payment,
+              tip: backgroundService.currentRide.value!.tip,
+            );
+            backgroundService.currentRide.value = updatedRide;
+            backgroundService.rideStatus.value = 'Arrived';
+            print("SAHAr - MarkAsArrived: Local ride status updated to 'Arrived'");
+          }
+        } catch (e) {
+          print("SAHAr - MarkAsArrived: Failed to update local status: $e");
+        }
+
+        Get.snackbar(
+          "Arrival Confirmed",
+          "You have arrived at the pickup location",
+          backgroundColor: MColor.primaryNavy.withValues(alpha:0.1),
+          colorText: MColor.primaryNavy,
+          icon: Icon(Icons.check_circle, color: MColor.primaryNavy),
+          duration: const Duration(seconds: 3),
+        );
+      } else {
+        print("SAHAr - MarkAsArrived: Failed => ${response.statusText}");
+        Get.snackbar(
+          "Error",
+          "Failed to mark arrival: ${response.statusText}",
+          backgroundColor: Colors.red.withValues(alpha:0.1),
+          colorText: Colors.red,
+          icon: const Icon(Icons.error, color: Colors.red),
+        );
+      }
+    } catch (e) {
+      print("SAHAr - MarkAsArrived: Exception => $e");
+      Get.snackbar(
+        "Error",
+        "Network error: $e",
+        backgroundColor: Colors.red.withValues(alpha:0.1),
+        colorText: Colors.red,
+        icon: const Icon(Icons.error, color: Colors.red),
+      );
+    } finally {
+      isArriving.value = false;
+      print("SAHAr - MarkAsArrived: Processing flag reset");
+    }
+  }
+
+  // Start the ride after arriving at pickup location
+  Future<void> startRide(String rideId) async {
+    if (isStartingRide.value) return;
+
+    try {
+      isStartingRide.value = true;
+
+      String endpoint = "/api/Ride/$rideId/start";
+      print("SAHAr - StartRide: Endpoint => $endpoint");
+
+      final response = await _apiProvider.postData(endpoint, {});
+      print("SAHAr - StartRide: Response => ${response.statusCode} ${response.statusText}");
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Trigger haptic feedback
+        HapticFeedback.mediumImpact();
+
+        print("SAHAr - StartRide: Successfully started ride");
+
+        // ✅ Immediately update local ride status to "In-Progress"
+        try {
+          final backgroundService = Get.find<BackgroundTrackingService>();
+          if (backgroundService.currentRide.value != null) {
+            final updatedRide = RideAssignment(
+              rideId: backgroundService.currentRide.value!.rideId,
+              rideType: backgroundService.currentRide.value!.rideType,
+              fareEstimate: backgroundService.currentRide.value!.fareEstimate,
+              fareFinal: backgroundService.currentRide.value!.fareFinal,
+              createdAt: backgroundService.currentRide.value!.createdAt,
+              status: 'In-Progress', // ✅ Update status
+              passengerId: backgroundService.currentRide.value!.passengerId,
+              passengerName: backgroundService.currentRide.value!.passengerName,
+              passengerPhone: backgroundService.currentRide.value!.passengerPhone,
+              pickupLocation: backgroundService.currentRide.value!.pickupLocation,
+              pickUpLat: backgroundService.currentRide.value!.pickUpLat,
+              pickUpLon: backgroundService.currentRide.value!.pickUpLon,
+              dropoffLocation: backgroundService.currentRide.value!.dropoffLocation,
+              dropoffLat: backgroundService.currentRide.value!.dropoffLat,
+              dropoffLon: backgroundService.currentRide.value!.dropoffLon,
+              stops: backgroundService.currentRide.value!.stops,
+              passengerCount: backgroundService.currentRide.value!.passengerCount,
+              payment: backgroundService.currentRide.value!.payment,
+              tip: backgroundService.currentRide.value!.tip,
+            );
+            backgroundService.currentRide.value = updatedRide;
+            backgroundService.rideStatus.value = 'In-Progress';
+            print("SAHAr - StartRide: Local ride status updated to 'In-Progress'");
+          }
+        } catch (e) {
+          print("SAHAr - StartRide: Failed to update local status: $e");
+        }
+
+        Get.snackbar(
+          "Ride Started",
+          "The ride has begun",
+          backgroundColor: Colors.green.withValues(alpha:0.1),
+          colorText: Colors.green,
+          icon: Icon(Icons.check_circle, color: Colors.green),
+          duration: const Duration(seconds: 3),
+        );
+      } else {
+        print("SAHAr - StartRide: Failed => ${response.statusText}");
+        Get.snackbar(
+          "Error",
+          "Failed to start ride: ${response.statusText}",
+          backgroundColor: Colors.red.withValues(alpha:0.1),
+          colorText: Colors.red,
+          icon: const Icon(Icons.error, color: Colors.red),
+        );
+      }
+    } catch (e) {
+      print("SAHAr - StartRide: Exception => $e");
+      Get.snackbar(
+        "Error",
+        "Network error: $e",
+        backgroundColor: Colors.red.withValues(alpha:0.1),
+        colorText: Colors.red,
+        icon: const Icon(Icons.error, color: Colors.red),
+      );
+    } finally {
+      isStartingRide.value = false;
+      print("SAHAr - StartRide: Processing flag reset");
     }
   }
 

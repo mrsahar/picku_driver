@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pick_u_driver/core/background_tracking_service.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
+import 'package:pick_u_driver/providers/api_provider.dart';
 import 'package:pick_u_driver/utils/theme/mcolors.dart';
 
 
 class DriverStatusController extends GetxController {
   final BackgroundTrackingService _backgroundService = BackgroundTrackingService.to;
+  final ApiProvider _apiProvider = Get.find<ApiProvider>();
 
   // Observable status
   var isOnline = false.obs;
@@ -44,9 +46,14 @@ class DriverStatusController extends GetxController {
 
   /// Sync online status with background service
   void _syncWithBackgroundService() {
-    // Listen to background service running state
+    // Listen to background service running state changes
+    // Only sync when service stops unexpectedly (not during our controlled stop)
     ever(_backgroundService.isRunning, (running) {
-      isOnline.value = running;
+      // If service stopped but we think we're online, sync the state
+      if (!running && isOnline.value) {
+        print('⚠️ SAHAr Background service stopped unexpectedly - syncing status');
+        isOnline.value = false;
+      }
     });
   }
 
@@ -90,27 +97,84 @@ class DriverStatusController extends GetxController {
       print('🔄 SAHAr Driver ID: $_driverId');
       print('🔄 SAHAr Driver Name: $_driverName');
 
-      bool success = await _backgroundService.startBackgroundService();
-
-      if (!success) {
-        print('❌ SAHAr Background service returned false');
-        throw Exception('Failed to start background service');
-      }
-
+      // ✅ Set online immediately for smooth UI transition
       isOnline.value = true;
 
+      // ✅ STEP 1: Call setDriverAvailable API first
+      print('📡 SAHAr Calling setDriverAvailable API...');
+      final apiResponse = await _apiProvider.setDriverAvailable(_driverId!);
+
+      if (!apiResponse.isOk) {
+        print('❌ SAHAr setDriverAvailable API failed: ${apiResponse.statusCode}');
+        String errorMessage = 'Failed to set driver available';
+
+        if (apiResponse.body != null) {
+          if (apiResponse.body is Map<String, dynamic>) {
+            errorMessage = apiResponse.body['message'] ?? errorMessage;
+          } else if (apiResponse.body is String) {
+            errorMessage = apiResponse.body;
+          }
+        }
+
+        throw Exception(errorMessage);
+      }
+
+      print('✅ SAHAr setDriverAvailable API successful');
+
+      // ✅ STEP 2: Start background service in background (non-blocking)
+      // UI is already showing "ONLINE", now we connect in background
+      print('🔄 SAHAr Starting background service in background...');
+
+      // Show immediate success feedback to user
       Get.snackbar(
         'You\'re Online!',
-        'Ready to receive ride requests',
-        duration: const Duration(seconds: 3),
+        'Connecting to server...',
+        duration: const Duration(seconds: 2),
         margin: const EdgeInsets.all(16),
         borderRadius: 12,
         snackPosition: SnackPosition.TOP,
       );
-      print('✅ SAHAr Driver is now online');
+
+      // Start background service without blocking UI
+      _backgroundService.startBackgroundService().then((success) {
+        if (success) {
+          print('✅ SAHAr Background service started successfully');
+
+        } else {
+          print('❌ SAHAr Background service failed to start');
+          // Revert online status if background service fails
+          isOnline.value = false;
+          Get.snackbar(
+            'Connection Failed',
+            'Failed to connect to server',
+            duration: const Duration(seconds: 3),
+            margin: const EdgeInsets.all(16),
+            borderRadius: 12,
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: Colors.red.shade100,
+          );
+        }
+      }).catchError((e) {
+        print('❌ SAHAr Background service error: $e');
+        isOnline.value = false;
+        Get.snackbar(
+          'Error',
+          'Failed to start background service',
+          duration: const Duration(seconds: 3),
+          margin: const EdgeInsets.all(16),
+          borderRadius: 12,
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.red.shade100,
+        );
+      });
+
+      print('✅ SAHAr Driver status set to online (background service connecting...)');
     } catch (e) {
       print('❌ SAHAr Error going online: $e');
       print('❌ SAHAr Stack trace: ${StackTrace.current}');
+
+      // ✅ Revert online status on error
+      isOnline.value = false;
 
       // Provide more specific error messages
       String errorMessage = 'Failed to go online';
@@ -120,6 +184,8 @@ class DriverStatusController extends GetxController {
         errorMessage = 'Cannot connect to server. Check your internet connection';
       } else if (e.toString().contains('permission')) {
         errorMessage = 'Location permission is required';
+      } else if (e.toString().contains('set driver available')) {
+        errorMessage = 'Failed to set driver status on server';
       }
 
       throw Exception('$errorMessage: $e');

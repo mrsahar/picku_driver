@@ -44,7 +44,6 @@ class PaymentTransaction {
   final String paymentMethod;
   final double paidAmount;
   final double tipAmount;
-  final double adminShare;
   final double driverShare;
   final String paymentStatus;
   final String createdAt;
@@ -55,7 +54,6 @@ class PaymentTransaction {
     required this.paymentMethod,
     required this.paidAmount,
     required this.tipAmount,
-    required this.adminShare,
     required this.driverShare,
     required this.paymentStatus,
     required this.createdAt,
@@ -65,10 +63,9 @@ class PaymentTransaction {
     return PaymentTransaction(
       paymentId: json['paymentId'] ?? '',
       rideId: json['rideId'] ?? '',
-      paymentMethod: json['paymentMethod'] ?? 'N/A',
+      paymentMethod: json['paymentMethod'] ?? 'Stripe',
       paidAmount: (json['paidAmount'] ?? 0).toDouble(),
       tipAmount: (json['tipAmount'] ?? 0).toDouble(),
-      adminShare: (json['adminShare'] ?? 0).toDouble(),
       driverShare: (json['driverShare'] ?? 0).toDouble(),
       paymentStatus: json['paymentStatus'] ?? 'Pending',
       createdAt: json['createdAt'] ?? '',
@@ -81,7 +78,6 @@ class PaymentTransaction {
     'paymentMethod': paymentMethod,
     'paidAmount': paidAmount,
     'tipAmount': tipAmount,
-    'adminShare': adminShare,
     'driverShare': driverShare,
     'paymentStatus': paymentStatus,
     'createdAt': createdAt,

@@ -31,6 +31,11 @@ class MapService extends GetxService with WidgetsBindingObserver {
   final int _animationSteps = 60; // 60 steps for 1 second @ 60fps approx
   bool _isAppInForeground = true;
 
+  // Camera follow control - prevent jitter when user pans
+  bool _userHasPannedAway = false;
+  DateTime? _lastUserPanTime;
+  static const Duration _panResetDuration = Duration(seconds: 5); // Reset after 5s of no pan
+
   @override
   void onInit() {
     super.onInit();
@@ -70,6 +75,25 @@ class MapService extends GetxService with WidgetsBindingObserver {
 
   void setMapController(GoogleMapController controller) {
     mapController = controller;
+  }
+
+  /// Call this when user manually moves the camera (from onCameraMove in HomeScreen)
+  void onUserCameraMove() {
+    _userHasPannedAway = true;
+    _lastUserPanTime = DateTime.now();
+  }
+
+  /// Check if enough time has passed since last pan to resume auto-follow
+  bool get _shouldFollowDriver {
+    if (!_userHasPannedAway) return true;
+    if (_lastUserPanTime == null) return true;
+
+    final timeSincePan = DateTime.now().difference(_lastUserPanTime!);
+    if (timeSincePan > _panResetDuration) {
+      _userHasPannedAway = false;
+      return true;
+    }
+    return false;
   }
 
   Future<void> _loadCustomMarkers() async {
@@ -219,14 +243,15 @@ class MapService extends GetxService with WidgetsBindingObserver {
       LatLng currentPos = LatLng(lat, lng);
       _updateMarkerInternal(currentPos, rotation);
 
-      // Har step par camera move karne ki zaroorat nahi (performance issue)
-      // Sirf end par ya har 10th step par move kar sakte hain
-      if (step % 20 == 0) {
-        _moveCameraSmoothly(currentPos, rotation);
-      }
+      // ✅ OPTIMIZATION: Remove camera updates from animation loop completely
+      // Camera will only follow at the END of animation, and only if user hasn't panned
 
       if (step >= _animationSteps) {
         timer.cancel();
+        // Move camera once at the end, only if user hasn't manually panned
+        if (_shouldFollowDriver) {
+          _moveCameraSmoothly(end, rotation);
+        }
       }
     });
   }
@@ -242,10 +267,11 @@ class MapService extends GetxService with WidgetsBindingObserver {
       flat: true, // Makes the car look 2D on the road
     );
 
-    var updatedSet = Set<Marker>.from(markers);
-    updatedSet.removeWhere((m) => m.markerId.value == 'current_location');
-    updatedSet.add(driver);
-    markers.assignAll(updatedSet);
+    // ✅ SUPER OPTIMIZATION: Batch the remove and add into a single observable update
+    // Using assignAll instead of removeWhere + add prevents double rebuild
+    final updatedMarkers = markers.where((m) => m.markerId.value != 'current_location').toSet();
+    updatedMarkers.add(driver);
+    markers.assignAll(updatedMarkers);
   }
 
   /// Camera ko route ke mutabiq fit karna
@@ -294,9 +320,19 @@ class MapService extends GetxService with WidgetsBindingObserver {
     return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
   }
 
-  Future<void> animateToLocation(LatLng location, {double zoom = 17.0}) async {
+  Future<void> animateToLocation(LatLng location, {double zoom = 17.0, double bearing = 0.0}) async {
     if (mapController == null) return;
-    mapController!.animateCamera(CameraUpdate.newLatLng(location));
+    // ✅ Reset bearing to North (0) for better orientation when returning to driver position
+    mapController!.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: location,
+          zoom: zoom,
+          bearing: bearing, // Default 0 = North
+          tilt: 0,
+        ),
+      ),
+    );
   }
 
   /// 3. Dynamically Update Route Polyline Only (Call from Background Service)

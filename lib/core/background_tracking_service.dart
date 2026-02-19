@@ -10,6 +10,7 @@ import 'package:pick_u_driver/core/location_service.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/core/global_variables.dart';
 import 'package:pick_u_driver/core/ride_notification_service.dart';
+import 'package:pick_u_driver/core/chat_notification_service.dart';
 import 'package:pick_u_driver/core/notification_sound_service.dart';
 import 'package:pick_u_driver/core/internet_connectivity_service.dart';
 import 'package:pick_u_driver/driver_screen/widget/modern_payment_dialog.dart';
@@ -42,6 +43,17 @@ class BackgroundTrackingService extends GetxService {
     try {
       return Get.isRegistered<RideNotificationService>()
           ? RideNotificationService.to
+          : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Get chat notification service
+  ChatNotificationService? get _chatNotificationService {
+    try {
+      return Get.isRegistered<ChatNotificationService>()
+          ? ChatNotificationService.to
           : null;
     } catch (e) {
       return null;
@@ -99,6 +111,9 @@ class BackgroundTrackingService extends GetxService {
   // Marker update debouncing
   Timer? _markerUpdateDebounce;
   Position? _pendingMarkerUpdate;
+
+  // ✅ Prevent double-tap on reset buttons
+  bool _isResetting = false;
 
   // WakeLock management
   bool _isWakeLockEnabled = false;
@@ -163,25 +178,34 @@ class BackgroundTrackingService extends GetxService {
   /// Handle internet connection restored
   Future<void> _onInternetRestored() async {
     try {
-      print('🔄 SAHAr [BG] Internet restored, reconnecting...');
+      print('🔄 SAHAr [BG] Internet restored, reconnecting silently...');
 
-      // 1. Ensure SignalR connection + subscription in a single idempotent flow
+      // ✅ OPTIMIZATION: Batch all updates to prevent multiple UI rebuilds
+      // Ensure SignalR connection + subscription in a single idempotent flow
       await _ensureConnectedAndSubscribed();
 
-      // 2. Resume location updates if active
-      if (isLocationSending.value) {
-        _resumeLocationUpdates();
-      }
+      // ✅ Run background tasks asynchronously without blocking
+      Future.microtask(() async {
+        try {
+          // Resume location updates if active
+          if (isLocationSending.value) {
+            _resumeLocationUpdates();
+          }
 
-      // 3. Recalculate route if we have an active ride
-      if (currentRide.value != null && _locationService?.currentLatLng.value != null) {
-        print('🗺️ SAHAr [BG] Recalculating route after internet restoration');
-        await _recalculateRoute();
-      }
+          // Recalculate route if we have an active ride (in background)
+          if (currentRide.value != null && _locationService?.currentLatLng.value != null) {
+            print('🗺️ SAHAr [BG] Recalculating route after internet restoration');
+            await _recalculateRoute();
+          }
 
-      // 4. Sync any offline data
-      _syncOfflineData();
+          // Sync any offline data (in background)
+          _syncOfflineData();
+        } catch (e) {
+          print('❌ SAHAr [BG] Error in background restoration tasks: $e');
+        }
+      });
 
+      print('✅ SAHAr [BG] Internet restoration complete');
     } catch (e) {
       print('❌ SAHAr [BG] Error handling internet restoration: $e');
     }
@@ -210,6 +234,9 @@ class BackgroundTrackingService extends GetxService {
       // Reset route update tracking so it updates immediately
       _lastRouteUpdatePosition = null;
       _lastRouteUpdateTime = null;
+
+      // ✅ OPTIMIZATION: Debounce route updates to prevent rapid rebuilds
+      await Future.delayed(const Duration(milliseconds: 300));
 
       // Trigger route update based on current ride status
       if (ride.status == 'Waiting') {
@@ -668,6 +695,8 @@ class BackgroundTrackingService extends GetxService {
                         onPressed: () {
                           Get.back(); // Close popup
                           _resetRide(); // Clear everything
+                          // ✅ Ensure driver is back in ride assignment queue
+                          _ensureConnectedAndSubscribed();
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: MColor.primaryNavy,
@@ -696,6 +725,8 @@ class BackgroundTrackingService extends GetxService {
                         onPressed: () {
                           Get.back(); // Close popup
                           _resetRide(); // Clear everything
+                          // ✅ Ensure driver is back in ride assignment queue
+                          _ensureConnectedAndSubscribed();
                           Get.toNamed(AppRoutes.EarningSCREEN); // Navigate to earnings
                         },
                         style: ElevatedButton.styleFrom(
@@ -729,7 +760,12 @@ class BackgroundTrackingService extends GetxService {
 
   /// Set up all SignalR event handlers
   void _setupConnectionHandlers() {
-    if (_hubConnection == null) return;
+    if (_hubConnection == null) {
+      print('❌ SAHAr [BG] Cannot setup handlers - _hubConnection is null');
+      return;
+    }
+
+    print('🔧 SAHAr [BG] Setting up SignalR connection handlers...');
 
     // Connection state handlers
     _hubConnection!.onclose((error) {
@@ -748,8 +784,9 @@ class BackgroundTrackingService extends GetxService {
 
     _hubConnection!.onreconnected((connectionId) {
       print('✅ SAHAr Hub reconnected: $connectionId');
+      print('🟢 SAHAr Driver is Back Online'); // ✅ Log as 'Back Online'
       isConnected.value = true;
-      connectionStatus.value = 'Connected';
+      connectionStatus.value = 'Online'; // ✅ Changed from 'Connected' to 'Online'
       _stopReconnectionTimer();
       _resumeLocationUpdates();
 
@@ -767,51 +804,92 @@ class BackgroundTrackingService extends GetxService {
 
     // ===== RIDE ASSIGNMENT EVENTS =====
     _hubConnection!.on('NewRideAssigned', (List<Object?>? arguments) {
+      print('🚨🚨🚨 SAHAr [BG][SignalR] >>>>>> NewRideAssigned TRIGGERED <<<<<<');
+      print('🚨 SAHAr [BG][SignalR] NewRideAssigned RAW arguments: $arguments');
+      print('🚨 SAHAr [BG][SignalR] arguments type: ${arguments.runtimeType}');
+      print('🚨 SAHAr [BG][SignalR] arguments length: ${arguments?.length ?? 0}');
       if (arguments != null && arguments.isNotEmpty) {
+        print('🚨 SAHAr [BG][SignalR] arg[0] type: ${arguments[0].runtimeType}');
+        print('🚨 SAHAr [BG][SignalR] arg[0] value: ${arguments[0]}');
         try {
           print('🚕 SAHAr New ride assigned!');
           final rideData = arguments[0] as Map<String, dynamic>;
+          print('🚨 SAHAr [BG][SignalR] Parsed rideData keys: ${rideData.keys.toList()}');
+          print('🚨 SAHAr [BG][SignalR] Full rideData: $rideData');
           _playNotificationSound();
           _handleNewRideAssignment(rideData);
         } catch (e) {
           print('❌ SAHAr Error parsing ride: $e');
+          print('❌ SAHAr Stack trace: ${StackTrace.current}');
         }
+      } else {
+        print('⚠️ SAHAr [BG][SignalR] NewRideAssigned: arguments is null or empty');
       }
     });
 
     _hubConnection!.on('RideStatusUpdate', (List<Object?>? arguments) {
+      print('🚨🚨🚨 SAHAr [BG][SignalR] >>>>>> RideStatusUpdate TRIGGERED <<<<<<');
+      print('🚨 SAHAr [BG][SignalR] RideStatusUpdate RAW arguments: $arguments');
+      print('🚨 SAHAr [BG][SignalR] arguments type: ${arguments.runtimeType}');
+      print('🚨 SAHAr [BG][SignalR] arguments length: ${arguments?.length ?? 0}');
       if (arguments != null && arguments.isNotEmpty) {
+        print('🚨 SAHAr [BG][SignalR] arg[0] type: ${arguments[0].runtimeType}');
+        print('🚨 SAHAr [BG][SignalR] arg[0] value: ${arguments[0]}');
         try {
-          final statusUpdate = arguments[0] as Map<String, dynamic>; 
+          final statusUpdate = arguments[0] as Map<String, dynamic>;
+          print('🚨 SAHAr [BG][SignalR] Parsed statusUpdate keys: ${statusUpdate.keys.toList()}');
+          print('🚨 SAHAr [BG][SignalR] Full statusUpdate: $statusUpdate');
           _handleRideStatusUpdate(statusUpdate);
         } catch (e) {
           print('❌ SAHAr Error parsing status: $e');
+          print('❌ SAHAr Stack trace: ${StackTrace.current}');
         }
+      } else {
+        print('⚠️ SAHAr [BG][SignalR] RideStatusUpdate: arguments is null or empty');
       }
     });
 
     // ===== LOCATION TRACKING EVENTS =====
     _hubConnection!.on('LocationReceived', (List<Object?>? arguments) {
+      print('🚨 SAHAr [BG][SignalR] LocationReceived RAW: $arguments');
       print('📍 SAHAr Location acknowledged by server');
     });
 
     _hubConnection!.on('RideCompleted', (List<Object?>? arguments) {
+      print('🚨🚨🚨 SAHAr [BG][SignalR] >>>>>> RideCompleted TRIGGERED <<<<<<');
+      print('🚨 SAHAr [BG][SignalR] RideCompleted RAW arguments: $arguments');
+      print('🚨 SAHAr [BG][SignalR] arguments type: ${arguments.runtimeType}');
+      print('🚨 SAHAr [BG][SignalR] arguments length: ${arguments?.length ?? 0}');
       if (arguments != null && arguments.isNotEmpty) {
+        print('🚨 SAHAr [BG][SignalR] arg[0] type: ${arguments[0].runtimeType}');
+        print('🚨 SAHAr [BG][SignalR] arg[0] value: ${arguments[0]}');
         String completedRideId = arguments[0].toString();
         if (currentRideId.value == completedRideId) {
           print('✅ SAHAr Ride completed: $completedRideId');
           currentRideId.value = '';
           _playNotificationSound();
+        } else {
+          print('⚠️ SAHAr [BG][SignalR] RideCompleted ID mismatch - current: ${currentRideId.value}, received: $completedRideId');
         }
+      } else {
+        print('⚠️ SAHAr [BG][SignalR] RideCompleted: arguments is null or empty');
       }
     });
 // Update the PaymentCompleted handler in BackgroundTrackingService
 // Replace the existing handler with this:
 
     _hubConnection!.on('PaymentCompleted', (List<Object?>? arguments) {
+      print('🚨🚨🚨 SAHAr [BG][SignalR] >>>>>> PaymentCompleted TRIGGERED <<<<<<');
+      print('🚨 SAHAr [BG][SignalR] PaymentCompleted RAW arguments: $arguments');
+      print('🚨 SAHAr [BG][SignalR] arguments type: ${arguments.runtimeType}');
+      print('🚨 SAHAr [BG][SignalR] arguments length: ${arguments?.length ?? 0}');
       if (arguments != null && arguments.isNotEmpty) {
+        print('🚨 SAHAr [BG][SignalR] arg[0] type: ${arguments[0].runtimeType}');
+        print('🚨 SAHAr [BG][SignalR] arg[0] value: ${arguments[0]}');
         try {
           final paymentData = arguments[0] as Map<String, dynamic>;
+          print('🚨 SAHAr [BG][SignalR] Parsed paymentData keys: ${paymentData.keys.toList()}');
+          print('🚨 SAHAr [BG][SignalR] Full paymentData: $paymentData');
           String rideId = paymentData['rideId']?.toString() ?? '';
 
           print('💰 SAHAr Payment data received: $paymentData'); 
@@ -897,10 +975,22 @@ class BackgroundTrackingService extends GetxService {
 
     // ===== DRIVER STATUS EVENTS =====
     _hubConnection!.on('DriverStatusChanged', (List<Object?>? arguments) {
+      print('🚨🚨🚨 SAHAr [BG][SignalR] >>>>>> DriverStatusChanged TRIGGERED <<<<<<');
+      print('🚨 SAHAr [BG][SignalR] DriverStatusChanged RAW arguments: $arguments');
+      print('🚨 SAHAr [BG][SignalR] arguments type: ${arguments.runtimeType}');
+      print('🚨 SAHAr [BG][SignalR] arguments length: ${arguments?.length ?? 0}');
       if (arguments != null && arguments.length >= 2) {
+        print('🚨 SAHAr [BG][SignalR] arg[0] type: ${arguments[0].runtimeType}');
+        print('🚨 SAHAr [BG][SignalR] arg[0] value (driverId): ${arguments[0]}');
+        print('🚨 SAHAr [BG][SignalR] arg[1] type: ${arguments[1].runtimeType}');
+        print('🚨 SAHAr [BG][SignalR] arg[1] value (isOnline): ${arguments[1]}');
         try {
           String driverId = arguments[0].toString();
           bool isOnline = arguments[1] as bool;
+
+          print('🚨 SAHAr [BG][SignalR] Current driver ID: $_driverId');
+          print('🚨 SAHAr [BG][SignalR] Received driver ID: $driverId');
+          print('🚨 SAHAr [BG][SignalR] Is Online: $isOnline');
 
           if (driverId == _driverId) {
             print('🔄 SAHAr Driver status changed from server: ${isOnline ? "Online" : "Offline"}'); 
@@ -916,25 +1006,99 @@ class BackgroundTrackingService extends GetxService {
                 color: isOnline ? Colors.green.shade800 : Colors.orange.shade800,
               ),
             );
+          } else {
+            print('⚠️ SAHAr [BG][SignalR] DriverStatusChanged: driver ID mismatch');
           }
         } catch (e) {
           print('❌ SAHAr Error parsing driver status change: $e');
+          print('❌ SAHAr Stack trace: ${StackTrace.current}');
         }
+      } else {
+        print('⚠️ SAHAr [BG][SignalR] DriverStatusChanged: insufficient arguments');
       }
     });
+
+    // ===== CHAT MESSAGE EVENTS =====
+    _hubConnection!.on('ReceiveRideChatMessage', (List<Object?>? arguments) {
+      print('💬💬💬 SAHAr [BG][SignalR] >>>>>> ReceiveRideChatMessage TRIGGERED <<<<<<');
+      print('💬 SAHAr [BG][SignalR] ReceiveRideChatMessage RAW arguments: $arguments');
+      if (arguments != null && arguments.isNotEmpty) {
+        try {
+          final messageData = arguments[0] as Map<String, dynamic>;
+          print('💬 SAHAr [BG][SignalR] Message data: $messageData');
+
+          // Extract message details
+          final String senderId = messageData['senderId']?.toString() ?? '';
+          final String senderRole = messageData['senderRole']?.toString() ?? '';
+          final String message = messageData['message']?.toString() ?? '';
+          final String rideId = messageData['rideId']?.toString() ?? currentRideId.value;
+
+          print('💬 SAHAr [BG] New chat message received:');
+          print('   - Sender ID: $senderId');
+          print('   - Sender Role: $senderRole');
+          print('   - Message: $message');
+          print('   - Ride ID: $rideId');
+          print('   - Current Driver ID: $_driverId');
+
+          // Only show notification if message is from passenger (Rider)
+          // Check: senderRole is Rider AND senderId is NOT the current driver
+          final isFromPassenger = senderRole.toLowerCase() == 'rider';
+          final isNotFromMe = senderId != _driverId;
+
+          print('💬 SAHAr [BG] Message filtering:');
+          print('   - Is from passenger (Rider): $isFromPassenger');
+          print('   - Is not from me: $isNotFromMe');
+          print('   - Chat notification service available: ${_chatNotificationService != null}');
+
+          if (isFromPassenger && isNotFromMe) {
+            // Show notification using ChatNotificationService
+            if (_chatNotificationService != null) {
+              print('💬 SAHAr [BG] Showing chat notification...');
+              _chatNotificationService!.showChatMessageNotification(
+                senderName: 'Passenger',
+                message: message,
+                rideId: rideId,
+              );
+              print('✅ SAHAr [BG] Chat notification shown for passenger message');
+            } else {
+              print('❌ SAHAr [BG] ChatNotificationService not available - cannot show notification');
+            }
+          } else {
+            print('⏭️ SAHAr [BG] Skipping notification (not from passenger or from self)');
+          }
+        } catch (e) {
+          print('❌ SAHAr [BG] Error handling chat message: $e');
+          print('❌ SAHAr Stack trace: ${StackTrace.current}');
+        }
+      } else {
+        print('⚠️ SAHAr [BG][SignalR] ReceiveRideChatMessage: no arguments');
+      }
+    });
+
+    print('✅✅✅ SAHAr [BG] ALL SIGNALR HANDLERS REGISTERED SUCCESSFULLY ✅✅✅');
+    print('✅ SAHAr [BG] Listening for SignalR events:');
+    print('   - NewRideAssigned');
+    print('   - RideStatusUpdate');
+    print('   - LocationReceived');
+    print('   - RideCompleted');
+    print('   - PaymentCompleted');
+    print('   - DriverStatusChanged');
+    print('   - ReceiveRideChatMessage');
   }
 
 
   /// Initialize ActiveRideController after successful connection
+  /// ✅ NOTE: This is now mostly a no-op since ActiveRideController is initialized
+  /// in InitialBinding at app startup to prevent navigation issues
   void _initializeActiveRideController() {
     try {
       // Check if ActiveRideController is already registered
       if (!Get.isRegistered<ActiveRideController>()) {
-        print('🎯 SAHAr Initializing ActiveRideController after connection');
+        print('🎯 SAHAr Initializing ActiveRideController (fallback - should be initialized at startup)');
         Get.put(ActiveRideController(), permanent: true);
         print('✅ SAHAr ActiveRideController initialized successfully');
       } else {
-        print('ℹ️ SAHAr ActiveRideController already registered');
+        print('ℹ️ SAHAr ActiveRideController already registered (initialized at startup)');
       }
     } catch (e) {
       print('❌ SAHAr Error initializing ActiveRideController: $e');
@@ -1006,17 +1170,26 @@ class BackgroundTrackingService extends GetxService {
       }
       print('🌐 SAHAr Attempting hub start - internetOk=$internetOk, type=$connectionType');
 
-      connectionStatus.value = 'Connecting...';
+      // ✅ OPTIMIZATION: Only update status if it actually changed
+      if (connectionStatus.value != 'Connecting...') {
+        connectionStatus.value = 'Connecting...';
+      }
+
       await _hubConnection!.start();
-      isConnected.value = true;
-      connectionStatus.value = 'Connected';
+
+      // ✅ Batch observable updates together
+      if (!isConnected.value || connectionStatus.value != 'Online') {
+        isConnected.value = true;
+        connectionStatus.value = 'Online'; // ✅ Changed from 'Connected' to 'Online'
+      }
+
       print('✅ SAHAr Connected to hub');
 
-      // Initialize ActiveRideController after successful connection
-      _initializeActiveRideController();
-
-      // Sync offline data after successful connection
-      _syncOfflineData();
+      // ✅ Run initialization tasks asynchronously to avoid blocking
+      Future.microtask(() {
+        _initializeActiveRideController();
+        _syncOfflineData();
+      });
 
       return true;
     } catch (e) {
@@ -1136,10 +1309,77 @@ class BackgroundTrackingService extends GetxService {
   /// Handle new ride assignment
   void _handleNewRideAssignment(Map<String, dynamic> rideData) {
     try {
+      // ✅ CHECK: If this is a "Payment Received" status, handle it specially
+      if (rideData['status'] == 'Payment Received') {
+        print('💰💰💰 SAHAr PAYMENT RECEIVED in NewRideAssigned!');
+
+        // Get current ride data for payment info
+        double fareFinal = 0.0;
+        double tip = 0.0;
+
+        // Try to get fare from currentRide if available
+        if (currentRide.value != null) {
+          fareFinal = currentRide.value!.fareFinal;
+          tip = currentRide.value!.tip ?? 0.0;
+        }
+
+        // Parse fareFinal from rideData if available
+        if (rideData['fareFinal'] != null) {
+          if (rideData['fareFinal'] is num) {
+            fareFinal = (rideData['fareFinal'] as num).toDouble();
+          } else {
+            fareFinal = double.tryParse(rideData['fareFinal'].toString()) ?? fareFinal;
+          }
+        } else if (rideData['fareEstimate'] != null) {
+          if (rideData['fareEstimate'] is num) {
+            fareFinal = (rideData['fareEstimate'] as num).toDouble();
+          } else {
+            fareFinal = double.tryParse(rideData['fareEstimate'].toString()) ?? fareFinal;
+          }
+        }
+
+        // Parse tip from rideData if available
+        if (rideData['tip'] != null) {
+          if (rideData['tip'] is num) {
+            tip = (rideData['tip'] as num).toDouble();
+          } else {
+            tip = double.tryParse(rideData['tip'].toString()) ?? tip;
+          }
+        }
+
+        print('💰 SAHAr Payment Received - Fare: \$${fareFinal.toStringAsFixed(2)}, Tip: \$${tip.toStringAsFixed(2)}');
+
+        // Update flags
+        paymentCompleted.value = true;
+        isWaitingForPayment.value = false;
+
+        // Close any open dialogs/bottom sheets
+        if (showPaymentDialog.value || Get.isBottomSheetOpen == true) {
+          Get.back();
+        }
+
+        // Clear all UI elements before showing payment popup
+        _clearAllUIBeforePaymentPopup();
+
+        // Show payment success popup after a short delay
+        Future.delayed(const Duration(milliseconds: 300), () {
+          showPaymentSuccessPopup(
+            fareFinal: fareFinal,
+            tip: tip,
+          );
+        });
+
+        return; // Exit early, don't process as normal ride assignment
+      }
+
+      // ✅ Regular ride assignment processing
       final ride = RideAssignment.fromJson(rideData);
       currentRide.value = ride;
       rideStatus.value = ride.status;
       currentRideId.value = ride.rideId;
+
+      // ✅ Auto-subscribe to ride chat for notifications
+      _subscribeToRideChat(ride.rideId);
 
       //_showRideNotification(ride);
       _updateUIForRideStatus(ride);
@@ -1153,13 +1393,73 @@ class BackgroundTrackingService extends GetxService {
   /// Handle ride status updates
   void _handleRideStatusUpdate(Map<String, dynamic> statusData) {
     try {
+      print('🔄 SAHAr Status update received:');
+      print('   - Raw status data: $statusData');
+
+      // Check for "Payment Received" status directly
+      if (statusData['status'] == 'Payment Received') {
+        print('💰💰💰 SAHAr PAYMENT RECEIVED STATUS DETECTED!');
+
+        // Get payment details from statusData
+        double fareFinal = 0.0;
+        double tip = 0.0;
+
+        // Parse fareFinal
+        if (statusData['fareFinal'] != null) {
+          if (statusData['fareFinal'] is num) {
+            fareFinal = (statusData['fareFinal'] as num).toDouble();
+          } else {
+            fareFinal = double.tryParse(statusData['fareFinal'].toString()) ?? 0.0;
+          }
+        } else if (statusData['fareEstimate'] != null) {
+          if (statusData['fareEstimate'] is num) {
+            fareFinal = (statusData['fareEstimate'] as num).toDouble();
+          } else {
+            fareFinal = double.tryParse(statusData['fareEstimate'].toString()) ?? 0.0;
+          }
+        }
+
+        // Parse tip
+        if (statusData['tip'] != null) {
+          if (statusData['tip'] is num) {
+            tip = (statusData['tip'] as num).toDouble();
+          } else {
+            tip = double.tryParse(statusData['tip'].toString()) ?? 0.0;
+          }
+        }
+
+        print('💰 SAHAr Payment Received - Fare: \$${fareFinal.toStringAsFixed(2)}, Tip: \$${tip.toStringAsFixed(2)}');
+
+        // Update flags
+        paymentCompleted.value = true;
+        isWaitingForPayment.value = false;
+
+        // Close any open dialogs/bottom sheets
+        if (showPaymentDialog.value) {
+          Get.back();
+        }
+
+        // Clear all UI elements before showing payment popup
+        _clearAllUIBeforePaymentPopup();
+
+        // Show payment success popup after a short delay
+        Future.delayed(const Duration(milliseconds: 300), () {
+          showPaymentSuccessPopup(
+            fareFinal: fareFinal,
+            tip: tip,
+          );
+        });
+
+        return; // Exit early, don't process as normal status update
+      }
+
+      // Regular status update processing
       final ride = RideAssignment.fromJson(statusData);
 
       // Check if this is a payment completion update
       final wasWaitingForPayment = isWaitingForPayment.value;
       final hasPaymentCompleted = ride.payment == 'Successful' && ride.status == 'Completed';
 
-      print('🔄 SAHAr Status update received:');
       print('   - Status: ${ride.status}');
       print('   - Payment: ${ride.payment}');
       print('   - Was waiting: $wasWaitingForPayment');
@@ -1189,8 +1489,6 @@ class BackgroundTrackingService extends GetxService {
 
         return; // Don't update UI for ride status
       }
-
-      // Normal status update (not payment completion)
       _updateUIForRideStatus(ride);
 
       print('🔄 SAHAr Ride status: ${ride.status}');
@@ -1198,60 +1496,6 @@ class BackgroundTrackingService extends GetxService {
       print('❌ SAHAr Error handling status: $e');
     }
   }
-
-  // void _showRideNotification(RideAssignment ride) {
-  //   // Don't show notification if we're already handling payment completion
-  //   if (ride.status == 'Completed' && ride.payment == 'Successful' && paymentCompleted.value) {
-  //     print('🔕 SAHAr Skipping notification - payment already completed');
-  //     return;
-  //   }
-  //
-  //   String title = '';
-  //   String message = '';
-  //   Color bgColor = Colors.blue.shade100;
-  //   Color textColor = Colors.blue.shade800;
-  //   IconData icon = Icons.directions_car;
-  //
-  //   switch (ride.status) {
-  //     case 'Waiting':
-  //       title = 'New Ride Request!';
-  //       message = 'Pickup: ${ride.pickupLocation}';
-  //       bgColor = Colors.orange.shade100;
-  //       textColor = Colors.orange.shade800;
-  //       icon = Icons.schedule;
-  //       break;
-  //     case 'In-Progress':
-  //       title = 'Ride Started';
-  //       message = 'Heading to: ${ride.dropoffLocation}';
-  //       bgColor = Colors.blue.shade100;
-  //       textColor = Colors.blue.shade800;
-  //       icon = Icons.directions_car;
-  //       break;
-  //     case 'Completed':
-  //       // Only show notification if payment is not yet successful
-  //       if (ride.payment != 'Successful') {
-  //         title = 'Ride Completed';
-  //         message = 'Waiting for payment...';
-  //         bgColor = Colors.green.shade100;
-  //         textColor = Colors.green.shade800;
-  //         icon = Icons.check_circle;
-  //       } else {
-  //         // Payment is successful, don't show notification as popup will handle it
-  //         return;
-  //       }
-  //       break;
-  //   }
-  //
-  //   Get.snackbar(
-  //     title,
-  //     message,
-  //     backgroundColor: bgColor,
-  //     colorText: textColor,
-  //     duration: const Duration(seconds: 5),
-  //     icon: Icon(icon, color: textColor),
-  //   );
-  // }
-
   /// Update UI for ride status and trigger notifications
   void _updateUIForRideStatus(RideAssignment ride) {
     // Trigger notification based on status
@@ -1259,7 +1503,13 @@ class BackgroundTrackingService extends GetxService {
 
     switch (ride.status) {
       case 'Waiting':
+      case 'Pending':
         _showRouteToPickup(ride);
+        break;
+      case 'Arrived':
+        // Driver has arrived at pickup, keep showing the route but prepare for ride start
+        _showRouteToPickup(ride);
+        print('✅ SAHAr Driver has arrived at pickup location');
         break;
       case 'In-Progress':
         _showRouteToAllStops(ride);
@@ -1280,11 +1530,16 @@ class BackgroundTrackingService extends GetxService {
     try {
       switch (ride.status) {
         case 'Waiting':
+        case 'Pending':
           _rideNotificationService?.notifyNewRide(
             rideId: ride.rideId,
             pickupLocation: ride.pickupLocation,
             passengerName: ride.passengerName,
           );
+          break;
+        case 'Arrived':
+          // Notify that driver has arrived at pickup
+          print('📍 SAHAr Notifying arrival at pickup location');
           break;
         case 'In-Progress':
           _rideNotificationService?.notifyRideInProgress(
@@ -1378,7 +1633,7 @@ class BackgroundTrackingService extends GetxService {
     }
   }
 
-  /// Show route to next stop only (not all stops)
+  /// Show route to final destination passing through ALL remaining stops as waypoints (like Uber/Careem)
   Future<void> _showRouteToAllStops(RideAssignment ride) async {
     // Prevent concurrent updates
     if (_isUpdatingRoute) {
@@ -1419,34 +1674,54 @@ class BackgroundTrackingService extends GetxService {
       }
 
       final origin = _locationService!.currentLatLng.value!;
-      final allStops = ride.stops
-          .map((stop) => LatLng(stop.latitude, stop.longitude))
-          .toList();
 
-      if (allStops.isEmpty) return;
+      // ✅ UBER/CAREEM BEHAVIOR: Sort stops by stopOrder to ensure correct sequence
+      final sortedStops = List<RideStop>.from(ride.stops)
+        ..sort((a, b) => a.stopOrder.compareTo(b.stopOrder));
 
-      // ✅ Only draw route to NEXT stop (first stop in list)
-      // This is the immediate destination, not all stops
-      final nextStop = allStops.first;
+      if (sortedStops.isEmpty) {
+        print('⚠️ SAHAr No stops available, cannot draw route');
+        return;
+      }
 
-      // Get route from driver to next stop only (NO waypoints)
+      // ✅ CRITICAL CHANGE: Route from Driver → Final Destination, passing through ALL remaining stops
+      // Final destination is the LAST stop in the sorted list
+      final finalDestination = LatLng(
+        sortedStops.last.latitude,
+        sortedStops.last.longitude,
+      );
+
+      // All stops EXCEPT the last one are waypoints (intermediate stops)
+      final waypoints = sortedStops.length > 1
+          ? sortedStops
+              .sublist(0, sortedStops.length - 1) // All stops except the last
+              .map((stop) => LatLng(stop.latitude, stop.longitude))
+              .toList()
+          : <LatLng>[]; // No waypoints if only one stop (direct to destination)
+
+      print('🗺️ SAHAr Drawing route with ${waypoints.length} waypoints to final destination');
+      print('   Origin: Driver at ${origin.latitude}, ${origin.longitude}');
+      print('   Waypoints: ${waypoints.length} stops');
+      print('   Destination: ${finalDestination.latitude}, ${finalDestination.longitude}');
+
+      // ✅ Get route from driver to final destination passing through ALL remaining stops as waypoints
       // NOTE: useStraightLineOnError=false so that on API failure we keep the
       // existing polyline instead of replacing it with a synthetic straight line.
       final points = await GoogleDirectionsService.getRoutePoints(
         origin: origin,
-        destination: nextStop,
-        // No waypoints - direct route to next stop only
+        destination: finalDestination,
+        waypoints: waypoints.isNotEmpty ? waypoints : null,
         useStraightLineOnError: false,
       );
 
-      // Draw single polyline from driver to next stop
+      // Draw single polyline showing complete route through all stops
       _setPolyline(points, MColor.primaryNavy);
 
-      // ✅ Show markers for all stops (for visual reference)
+      // ✅ Show markers for ALL remaining stops (NO pickup marker in In-Progress phase)
       final markers = <Marker>{};
 
-      for (var stop in ride.stops) {
-        final isDestination = stop.stopOrder == ride.stops.length - 1;
+      for (var stop in sortedStops) {
+        final isDestination = stop.stopOrder == sortedStops.length - 1;
         final isNextStop = stop.stopOrder == 0; // First stop is next
         
         markers.add(
@@ -1470,7 +1745,7 @@ class BackgroundTrackingService extends GetxService {
 
       rideMarkers.assignAll(markers);
       
-      print('✅ SAHAr Route to NEXT stop displayed - Driver → Next Stop (1 polyline)');
+      print('✅ SAHAr Route to ALL stops displayed - Driver → Waypoints → Final Destination (1 polyline, ${waypoints.length} waypoints)');
     } catch (e) {
       print('❌ SAHAr Error showing route: $e');
     } finally {
@@ -1546,17 +1821,90 @@ class BackgroundTrackingService extends GetxService {
 
   /// Reset ride state
   void _resetRide() {
+    // ✅ Prevent double-tap - if already resetting, skip
+    if (_isResetting) {
+      print('⚠️ SAHAr Reset already in progress, ignoring duplicate call');
+      return;
+    }
+
+    _isResetting = true;
+
     currentRide.value = null;
-    rideStatus.value = 'No Active Ride';
-    // ✅ Clear route using MapService
+    rideStatus.value = 'Online'; // ✅ Changed from 'No Active Ride' to 'Online' for Uber-like experience
+
+    // ✅ Clear route and markers (moved from _clearAllUIBeforePaymentPopup)
     if (Get.isRegistered<MapService>()) {
       MapService.to.polylines.clear();
     }
     rideMarkers.clear();
+
     currentRideId.value = '';
     isWaitingForPayment.value = false;
     paymentCompleted.value = false;
     showPaymentDialog.value = false;
+
+    // ✅ Background tracking and SignalR connection remain active - driver stays ready for next request
+    // No need to stop tracking or disconnect - this is key for seamless Uber-like experience
+
+    // ✅ Animate camera back to driver's current position with bearing reset to North (0)
+    if (lastSentLocation.value != null && Get.isRegistered<MapService>()) {
+      MapService.to.animateToLocation(
+        LatLng(lastSentLocation.value!.latitude, lastSentLocation.value!.longitude),
+        zoom: 17.0,
+        bearing: 0.0, // ✅ Reset to North for better orientation
+      );
+      print('📍 SAHAr Camera animated back to driver position (bearing reset to North)');
+    }
+
+    // Reset the double-tap prevention flag after a short delay
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _isResetting = false;
+    });
+  }
+
+  /// Subscribe to ride chat to receive chat notifications
+  Future<void> _subscribeToRideChat(String rideId) async {
+    if (_hubConnection == null || rideId.isEmpty) {
+      print('⚠️ SAHAr Cannot subscribe to chat: hubConnection is null or rideId is empty');
+      return;
+    }
+
+    try {
+      print('💬 SAHAr [BG] Subscribing to ride chat: $rideId');
+
+      // ✅ Ensure chat notification service is available and has permission
+      if (_chatNotificationService != null) {
+        // Check if permission is already granted
+        final hasPermission = await _chatNotificationService!.checkNotificationPermission();
+
+        if (!hasPermission) {
+          print('⚠️ SAHAr [BG] Chat notification permission not granted, requesting...');
+          // Request permission
+          final granted = await _chatNotificationService!.requestNotificationPermission();
+          if (granted) {
+            print('✅ SAHAr [BG] Chat notification permission granted');
+          } else {
+            print('❌ SAHAr [BG] Chat notification permission denied - notifications will not work');
+          }
+        } else {
+          print('✅ SAHAr [BG] Chat notification permission already granted');
+        }
+      } else {
+        print('⚠️ SAHAr [BG] ChatNotificationService not available');
+      }
+
+      // Join the ride chat room via SignalR
+      await _hubConnection!.invoke('JoinRideChat', args: [rideId]);
+
+      print('✅ SAHAr [BG] Subscribed to ride chat for: $rideId');
+
+      // Request chat history to show any existing messages
+      await _hubConnection!.invoke('GetRideChatHistory', args: [rideId]);
+
+      print('💬 SAHAr [BG] Chat history requested for: $rideId');
+    } catch (e) {
+      print('❌ SAHAr [BG] Error subscribing to chat: $e');
+    }
   }
 
   /// Public method to start tracking (called by ActiveRideController)
@@ -1820,21 +2168,46 @@ class BackgroundTrackingService extends GetxService {
             try {
               // ✅ Driver ki CURRENT location (from taxi marker)
               LatLng driverKiJaga = LatLng(position.latitude, position.longitude);
-              LatLng manzil; // Kahan jana hai
+              LatLng manzil; // Kahan jana hai (final destination)
+              List<LatLng>? waypoints; // Intermediate stops
               Color routeColor;
 
-              if (rideStatus.value == 'Waiting') {
-                // Agar passenger ko lene ja raha hai
+              if (rideStatus.value == 'Waiting' || rideStatus.value == 'Pending' || rideStatus.value == 'Arrived') {
+                // Phase 1: Agar passenger ko lene ja raha hai - direct to pickup
                 manzil = LatLng(currentRide.value!.pickUpLat, currentRide.value!.pickUpLon);
-                routeColor = Colors.orange;
+                waypoints = null; // No waypoints, direct route
+                routeColor = rideStatus.value == 'Arrived' ? Colors.green : Colors.orange;
+
+                print('🟠 SAHAr Phase 1 (${rideStatus.value}): Route to Pickup Location');
               } else if (rideStatus.value == 'In-Progress') {
-                // ✅ Sirf NEXT stop tak route (first stop in list)
-                if (currentRide.value!.stops.isNotEmpty) {
-                  final nextStop = currentRide.value!.stops.first; // Next immediate stop
-                  manzil = LatLng(nextStop.latitude, nextStop.longitude);
+                // Phase 2: Route to final destination through ALL remaining stops
+
+                // Sort stops by stopOrder to ensure correct sequence
+                final sortedStops = List<RideStop>.from(currentRide.value!.stops)
+                  ..sort((a, b) => a.stopOrder.compareTo(b.stopOrder));
+
+                if (sortedStops.isNotEmpty) {
+                  // Final destination is the LAST stop
+                  final lastStop = sortedStops.last;
+                  manzil = LatLng(lastStop.latitude, lastStop.longitude);
+
+                  // All stops EXCEPT the last are waypoints
+                  waypoints = sortedStops.length > 1
+                      ? sortedStops
+                          .sublist(0, sortedStops.length - 1)
+                          .map((stop) => LatLng(stop.latitude, stop.longitude))
+                          .toList()
+                      : null;
+
+                  print('🔵 SAHAr Phase 2 (In-Progress): Route with ${waypoints?.length ?? 0} waypoints to final destination');
                 } else {
+                  // Fallback to dropoff if no stops
                   manzil = LatLng(currentRide.value!.dropoffLat, currentRide.value!.dropoffLon);
+                  waypoints = null;
+
+                  print('🔵 SAHAr Phase 2 (In-Progress): Direct route to dropoff (no stops)');
                 }
+
                 routeColor = MColor.primaryNavy;
               } else {
                 // Ride status not active, skip route update
@@ -1842,16 +2215,19 @@ class BackgroundTrackingService extends GetxService {
                 return;
               }
 
-              print('🔄 SAHAr Fetching new route from taxi position to destination...');
+              print('🔄 SAHAr Fetching new route from driver to destination...');
+              print('   Origin: ${driverKiJaga.latitude}, ${driverKiJaga.longitude}');
+              print('   Waypoints: ${waypoints?.length ?? 0}');
+              print('   Destination: ${manzil.latitude}, ${manzil.longitude}');
 
-              // ✅ Direct route from CURRENT taxi position to next destination
-              // This creates fresh polyline every 10 seconds from taxi marker
+              // ✅ Route from CURRENT driver position to final destination with waypoints
+              // This creates fresh polyline every 10 seconds/50 meters showing complete remaining path
               // NOTE: useStraightLineOnError=false so that on API failure we keep
               // the existing polyline (no sudden straight-line artifact).
               final points = await GoogleDirectionsService.getRoutePoints(
                 origin: driverKiJaga,
                 destination: manzil,
-                // No waypoints - direct route only
+                waypoints: waypoints,
                 useStraightLineOnError: false,
               );
 
@@ -1862,7 +2238,7 @@ class BackgroundTrackingService extends GetxService {
               _lastRouteUpdateTime = DateTime.now();
               _lastRouteUpdatePosition = driverKiJaga;
 
-              print('✅ SAHAr Route updated from taxi marker (${points.length} points)');
+              print('✅ SAHAr Route updated from driver position (${points.length} points, ${waypoints?.length ?? 0} waypoints)');
               print('🔄 SAHAr Next update in 10 seconds or 50 meters');
             } catch (e) {
               print('❌ SAHAr Error updating route: $e');
@@ -2131,12 +2507,8 @@ class BackgroundTrackingService extends GetxService {
       print('💰 SAHAr Dialog closed');
     }
 
-    // Clear ride-related UI elements
-    // ✅ Clear route using MapService
-    if (Get.isRegistered<MapService>()) {
-      MapService.to.polylines.clear();
-    }
-    rideMarkers.clear();
+    // ✅ DO NOT clear polylines or markers here - driver should see final route during payment popup
+    // Polylines and markers will be cleared only when driver clicks OK/View Earnings in _resetRide()
 
     // Reset ride widget state by clearing current ride temporarily
     final tempRide = currentRide.value;
@@ -2148,7 +2520,7 @@ class BackgroundTrackingService extends GetxService {
       currentRide.value = tempRide;
     });
 
-    print('🧹 SAHAr All UI elements cleared');
+    print('🧹 SAHAr UI elements cleared (route remains visible)');
   }
 
   /// Play notification sound when SignalR message is received

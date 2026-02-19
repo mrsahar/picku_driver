@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:pick_u_driver/routes/app_routes.dart';
 
 class RideNotificationService extends GetxService {
   static RideNotificationService get to => Get.find();
@@ -13,6 +14,9 @@ class RideNotificationService extends GetxService {
   var isNotificationPermissionGranted = false.obs;
   var hasRequestedPermission = false.obs;
 
+  // Payload separator constant
+  static const String _payloadSeparator = '|';
+
   @override
   void onInit() {
     super.onInit();
@@ -21,8 +25,9 @@ class RideNotificationService extends GetxService {
 
   /// Initialize notification settings
   Future<void> _initializeNotifications() async {
+    // Use app icon for notifications (ic_notification should be in drawable folder)
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@mipmap/ic_notification');
 
     const DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings(
@@ -43,14 +48,52 @@ class RideNotificationService extends GetxService {
     );
 
     print('🔔 SAHAr Ride Notification service initialized');
+
+    // Check permission on initialization
+    try {
+      await checkNotificationPermission();
+    } catch (e) {
+      print('⚠️ SAHAr Error refreshing ride notification permission on init: $e');
+    }
   }
 
-  /// Handle notification tap
+  /// Handle notification tap - parse payload and navigate accordingly
   void _onNotificationTap(NotificationResponse notificationResponse) {
     final String? payload = notificationResponse.payload;
-    if (payload != null) {
-      print('🔔 SAHAr Ride notification tapped with payload: $payload');
-      // You can navigate to ride details screen here if needed
+    if (payload == null || payload.isEmpty) {
+      print('⚠️ SAHAr Ride notification tapped but payload is empty');
+      return;
+    }
+
+    try {
+      // Parse payload: format is "rideId|status"
+      final parts = payload.split(_payloadSeparator);
+      if (parts.length != 2) {
+        print('⚠️ SAHAr Invalid ride notification payload format: $payload');
+        return;
+      }
+
+      final String rideId = parts[0];
+      final String status = parts[1];
+
+      print('🔔 SAHAr Ride notification tapped - rideId: $rideId, status: $status');
+
+      // Navigate based on status
+      switch (status.toLowerCase()) {
+        case 'waiting':
+        case 'in-progress':
+        case 'completed':
+          // Navigate to home screen where rides are displayed
+          Get.offAllNamed(AppRoutes.HOME);
+          break;
+        default:
+          print('⚠️ SAHAr Unknown ride status: $status');
+          Get.offAllNamed(AppRoutes.HOME);
+      }
+    } catch (e) {
+      print('❌ SAHAr Error parsing ride notification payload: $e');
+      // Fallback to home screen
+      Get.offAllNamed(AppRoutes.HOME);
     }
   }
 
@@ -99,42 +142,50 @@ class RideNotificationService extends GetxService {
     }
   }
 
+  /// Create payload from ride ID and status
+  String _createPayload(String rideId, String status) {
+    return '$rideId$_payloadSeparator$status';
+  }
+
   /// Show notification for ride status change with vibration and sound
   Future<void> showRideNotification({
     required String title,
     required String body,
     required String rideId,
     required String status,
+    bool isHighPriority = false,
   }) async {
-    try {
-      // Request permission if not granted
-      if (!isNotificationPermissionGranted.value) {
-        final hasPermission = await checkNotificationPermission();
-        if (!hasPermission) {
-          print('⚠️ SAHAr Skipping ride notification - permission not granted');
-          return;
-        }
-      }
+    // Skip if permission not granted
+    if (!isNotificationPermissionGranted.value) {
+      print('⚠️ SAHAr Skipping ride notification - permission not granted');
+      return;
+    }
 
+    try {
       print('🔔 SAHAr Showing ride notification: $title - $body');
 
       // Vibrate the device
       await _vibrateDevice();
 
-      // Play system notification sound and show notification
-      const AndroidNotificationDetails androidPlatformChannelSpecifics =
+      // Configure notification with high priority for heads-up display
+      final AndroidNotificationDetails androidPlatformChannelSpecifics =
           AndroidNotificationDetails(
         'ride_updates', // channel id
         'Ride Updates', // channel name
         channelDescription: 'Notifications for ride status updates',
-        importance: Importance.max,
-        priority: Priority.high,
+        importance: isHighPriority ? Importance.max : Importance.high,
+        priority: isHighPriority ? Priority.max : Priority.high,
         showWhen: true,
         enableVibration: true,
         playSound: true,
-        sound: RawResourceAndroidNotificationSound('notification'), // System default sound
-        styleInformation: BigTextStyleInformation(''),
+        sound: const RawResourceAndroidNotificationSound('notification'),
+        styleInformation: const BigTextStyleInformation(''),
         category: AndroidNotificationCategory.status,
+        // Enable heads-up notification for high priority
+        fullScreenIntent: isHighPriority,
+        visibility: NotificationVisibility.public,
+        // Use small icon from drawable (should be white/transparent for Android)
+        icon: '@drawable/ic_notification',
       );
 
       const DarwinNotificationDetails iOSPlatformChannelSpecifics =
@@ -143,9 +194,10 @@ class RideNotificationService extends GetxService {
         presentBadge: true,
         presentSound: true,
         sound: 'default',
+        interruptionLevel: InterruptionLevel.timeSensitive,
       );
 
-      const NotificationDetails platformChannelSpecifics = NotificationDetails(
+      final NotificationDetails platformChannelSpecifics = NotificationDetails(
         android: androidPlatformChannelSpecifics,
         iOS: iOSPlatformChannelSpecifics,
       );
@@ -155,7 +207,7 @@ class RideNotificationService extends GetxService {
         title,
         body,
         platformChannelSpecifics,
-        payload: '$rideId|$status',
+        payload: _createPayload(rideId, status),
       );
 
       print('✅ SAHAr Ride notification shown for status: $status');
@@ -180,17 +232,19 @@ class RideNotificationService extends GetxService {
     }
   }
 
-  /// Show notification for new ride (Waiting status)
+  /// Show high-priority notification for new ride (Waiting status)
+  /// This will appear as a heads-up notification
   Future<void> notifyNewRide({
     required String rideId,
     required String pickupLocation,
     required String passengerName,
   }) async {
     await showRideNotification(
-      title: '🚗 New Ride Request!',
-      body: 'Pickup: $pickupLocation\nPassenger: $passengerName',
+      title: '🚗 New Ride from $passengerName',
+      body: 'Pickup: $pickupLocation',
       rideId: rideId,
       status: 'Waiting',
+      isHighPriority: true, // High priority for heads-up display
     );
   }
 
@@ -200,10 +254,11 @@ class RideNotificationService extends GetxService {
     required String destination,
   }) async {
     await showRideNotification(
-      title: '🚕 Ride Started',
-      body: 'On the way to: $destination',
+      title: '🚕 Ride in Progress',
+      body: 'Heading to: $destination',
       rideId: rideId,
       status: 'In-Progress',
+      isHighPriority: false,
     );
   }
 
@@ -214,9 +269,10 @@ class RideNotificationService extends GetxService {
   }) async {
     await showRideNotification(
       title: '✅ Ride Completed',
-      body: 'Fare: \$${fare.toStringAsFixed(2)}',
+      body: 'You earned: \$${fare.toStringAsFixed(2)}',
       rideId: rideId,
       status: 'Completed',
+      isHighPriority: false,
     );
   }
 

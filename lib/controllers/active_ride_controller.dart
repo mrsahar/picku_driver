@@ -277,15 +277,19 @@ class ActiveRideController extends GetxController {
   void _navigateToHomeIfNeeded() {
     // Check if we're already on the home screen
     final currentRoute = Get.currentRoute;
-    print(' SAHAr ActiveRideController: Current route: $currentRoute');
-    
-    // Only navigate if we're not already on the main map
-    if (currentRoute != AppRoutes.mainMap) {
-      print(' SAHAr ActiveRideController: Navigating to home screen');
+    print('🧭 SAHAr Current screen: $currentRoute');
+
+    // ✅ FIX: Check for BOTH route variations (/main and /mainmap)
+    // This prevents unnecessary navigation when already on home screen
+    if (currentRoute != AppRoutes.mainMap &&
+        currentRoute != AppRoutes.MainMap &&
+        currentRoute != '/main' &&
+        currentRoute != '/mainmap') {
+      print('➡️ SAHAr Navigating to home screen from: $currentRoute');
       // Use offAllNamed to clear the navigation stack (typically from splash screen)
       Get.offAllNamed(AppRoutes.mainMap);
     } else {
-      print(' SAHAr ActiveRideController: Already on home screen, no navigation needed');
+      print('✅ SAHAr Already on home screen ($currentRoute), skipping navigation');
     }
   }
   // Get Driver's Last Ride

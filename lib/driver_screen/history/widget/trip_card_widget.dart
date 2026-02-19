@@ -190,7 +190,7 @@ class TripHistoryCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '\$${ride.fareFinal.toStringAsFixed(2)}',
+                    '\$${(double.tryParse(ride.driverPayment!) ?? 0.0).toStringAsFixed(2)}',
                   style: TextStyle(
                     fontSize: 18,
                     color: MColor.primaryNavy,

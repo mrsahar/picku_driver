@@ -692,7 +692,7 @@ class RideHistoryPage extends GetView<RideHistoryController> {
                                 ),
                               ),
                               Text(
-                                '\$${ride.fareEstimate.toStringAsFixed(2)}',
+                                  '\$${(double.tryParse(ride.driverPayment!) ?? 0.0).toStringAsFixed(2)}',
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.white.withValues(alpha:0.8),
@@ -701,29 +701,6 @@ class RideHistoryPage extends GetView<RideHistoryController> {
                               ),
                             ],
                           ),
-                          if (ride.adminCommission != null) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Admin Commission',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.white.withValues(alpha:0.8),
-                                  ),
-                                ),
-                                Text(
-                                  '\$${ride.adminCommission!.toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.white.withValues(alpha:0.8),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
                           if (ride.driverPayment != null) ...[
                             const SizedBox(height: 8),
                             Row(
@@ -766,7 +743,7 @@ class RideHistoryPage extends GetView<RideHistoryController> {
                                 ),
                               ),
                               Text(
-                                '\$${ride.fareFinal.toStringAsFixed(2)}',
+                                '\$${(double.tryParse(ride.driverPayment!) ?? 0.0).toStringAsFixed(2)}',
                                 style: const TextStyle(
                                   fontSize: 24,
                                   color: Colors.white,

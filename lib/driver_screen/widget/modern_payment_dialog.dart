@@ -40,8 +40,18 @@ class ModernPaymentBottomSheet extends StatelessWidget {
         print('   - Status: ${ride?.status}');
         print('   - Payment: ${ride?.payment}');
 
-        // If no ride, show error state
-
+        // If no ride, close the bottom sheet immediately
+        if (ride == null) {
+          print('⚠️ SAHAr Ride is null, closing payment bottom sheet');
+          // Close the bottom sheet after current frame
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (Get.isBottomSheetOpen == true) {
+              Get.back();
+            }
+          });
+          // Return empty container while closing
+          return const SizedBox.shrink();
+        }
 
         return SingleChildScrollView(
           child: Column(
@@ -149,7 +159,7 @@ class ModernPaymentBottomSheet extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      ride!.passengerName,
+                                      ride.passengerName,
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,

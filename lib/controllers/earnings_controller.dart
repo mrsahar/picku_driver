@@ -69,7 +69,7 @@ class EarningsController extends GetxController {
   String formatDate(String dateString) {
     try {
       final date = DateTime.parse(dateString);
-      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      return DateFormat('MMM dd, yyyy').format(date);
     } catch (e) {
       return dateString;
     }

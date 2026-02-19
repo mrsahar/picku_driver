@@ -263,34 +263,49 @@ Widget _buildDrawerHeader(BuildContext context, bool isDark) {
 
                     const SizedBox(height: 6),
 
-                    // --- Role Tag ---
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: MColor.trackingOrange.withValues(alpha:0.15),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.local_taxi_rounded,
-                            size: 12,
-                            color: MColor.trackingOrange,
+                    // --- Role Tag with Dynamic Ride Status ---
+                    FutureBuilder<String?>(
+                      future: SharedPrefsService.getRideStatus(),
+                      builder: (context, rideStatusSnapshot) {
+                        final rideStatus = rideStatusSnapshot.data ?? 'Offline';
+                        final isAvailable = rideStatus.toLowerCase() == 'available';
+
+                        // Color based on status
+                        final statusColor = isAvailable
+                            ? Colors.green
+                            : (rideStatus.toLowerCase() == 'offline'
+                                ? Colors.grey
+                                : MColor.trackingOrange);
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Active Driver',
-                            style: TextStyle(
-                              color: MColor.trackingOrange,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.4,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.local_taxi_rounded,
+                                size: 12,
+                                color: statusColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                rideStatus,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   ],
                 ),

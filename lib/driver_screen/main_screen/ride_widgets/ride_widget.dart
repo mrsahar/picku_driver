@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:action_slider/action_slider.dart';
 import 'package:pick_u_driver/controllers/chat_controller.dart';
 import 'package:pick_u_driver/controllers/ride_controller.dart';
 import 'package:pick_u_driver/routes/app_routes.dart';
@@ -114,7 +115,7 @@ class RideWidget extends StatelessWidget {
                 _buildLocationRow(
                   icon: Icons.radio_button_checked,
                   title: "PICKUP",
-                  value: ride.pickupLocation ?? "Pickup location",
+                  value: ride.pickupLocation,
                 ),
                 const SizedBox(height: 6),
                 _buildDashedLine(),
@@ -176,102 +177,331 @@ class RideWidget extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          // ── Fare + Action Button
-      // Replace the fare display section in RideWidget with this:
-
-// ── Fare + Action Button
-      Row(
-        children: [
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                gradient: LinearGradient(
-                  colors: [
-                    MColor.primaryNavy.withValues(alpha:0.05),
-                    MColor.primaryNavy.withValues(alpha:0.03)
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                border: Border.all(
-                  color: MColor.primaryNavy.withValues(alpha:0.08),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                      Icons.payments_rounded,
-                      color: MColor.primaryNavy.withValues(alpha:0.8),
-                      size: 18
+          // ── Fare + Action Button / Slide to Arrive / Slide to Start
+          if (ride.status == "Waiting" || ride.status == "Pending")
+            // Show "Slide to Arrive" for Waiting/Pending status
+            Column(
+              children: [
+                // Fare display for Waiting status
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: LinearGradient(
+                      colors: [
+                        MColor.primaryNavy.withValues(alpha:0.05),
+                        MColor.primaryNavy.withValues(alpha:0.03)
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(
+                      color: MColor.primaryNavy.withValues(alpha:0.08),
+                      width: 1,
+                    ),
                   ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      // Use fareEstimate for display, fallback to fareFinal
-                      "\$${(ride.fareEstimate ?? ride.fareFinal).toStringAsFixed(2)}"
-                          "${(ride.tip != null && ride.tip! > 0) ? " + \$${ride.tip!.toStringAsFixed(2)} Tip" : ""}",
-                      style: TextStyle(
-                        color: MColor.primaryNavy,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                  child: Row(
+                    children: [
+                      Icon(
+                          Icons.payments_rounded,
+                          color: MColor.primaryNavy.withValues(alpha:0.8),
+                          size: 18
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          "\$${(ride.fareEstimate ?? ride.fareFinal).toStringAsFixed(2)}"
+                              "${(ride.tip != null && ride.tip! > 0) ? " + \$${ride.tip!.toStringAsFixed(2)} Tip" : ""}",
+                          style: TextStyle(
+                            color: MColor.primaryNavy,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Slide to Arrive - Clean Design
+                Container(
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white, // Clean white background instead of dark gray
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: MColor.primaryNavy.withValues(alpha:0.15),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: ActionSlider.standard(
+                    sliderBehavior: SliderBehavior.stretch,
+                    width: double.infinity,
+                    height: 44,
+                    backgroundColor: Colors.transparent,
+                    toggleColor: MColor.primaryNavy,
+                    borderWidth: 0,
+                    icon: Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    loadingIcon: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Obx(() {
-            if (!(rideController.isOnStop.value || isInProgress)) {
-              return const SizedBox.shrink();
-            }
-            return ElevatedButton(
-              onPressed: rideController.isProcessingRequest.value
-                  ? null
-                  : () => rideController.toggleRideStatus(ride.rideId ?? ''),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: MColor.primaryNavy,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: rideController.isProcessingRequest.value
-                  ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-                  : Row(
-                children: [
-                  Icon(
-                    rideController.isOnStop.value
-                        ? Icons.play_arrow_rounded
-                        : Icons.pause_rounded,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    rideController.isOnStop.value ? "Resume" : "Pause",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
+                    successIcon: Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    action: (controller) async {
+                      if (rideController.isArriving.value) {
+                        controller.reset();
+                        return;
+                      }
+                      controller.loading();
+                      await rideController.markAsArrived(ride.rideId);
+                      controller.success();
+                      await Future.delayed(const Duration(milliseconds: 500));
+                      controller.reset();
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          color: MColor.primaryNavy,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Slide to Arrive',
+                          style: TextStyle(
+                            color: MColor.primaryNavy,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
+                ),
+              ],
+            )
+          else if (ride.status == "Arrived")
+            // Show "Slide to Start Ride" for Arrived status
+            Column(
+              children: [
+                // Fare display for Arrived status
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.green.withValues(alpha:0.05),
+                        Colors.green.withValues(alpha:0.03)
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(
+                      color: Colors.green.withValues(alpha:0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                          Icons.check_circle_outline,
+                          color: Colors.green.shade700,
+                          size: 18
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          "You've arrived at pickup location",
+                          style: TextStyle(
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Slide to Start Ride - Green Design
+                Container(
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: Colors.green.withValues(alpha:0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: ActionSlider.standard(
+                    sliderBehavior: SliderBehavior.stretch,
+                    width: double.infinity,
+                    height: 44,
+                    backgroundColor: Colors.transparent,
+                    toggleColor: Colors.green.shade700,
+                    borderWidth: 0,
+                    icon: Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    loadingIcon: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                    successIcon: Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    action: (controller) async {
+                      if (rideController.isStartingRide.value) {
+                        controller.reset();
+                        return;
+                      }
+                      controller.loading();
+                      await rideController.startRide(ride.rideId);
+                      controller.success();
+                      await Future.delayed(const Duration(milliseconds: 500));
+                      controller.reset();
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.green.shade700,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Slide to Start Ride',
+                          style: TextStyle(
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            // Show Fare + Pause/Resume for In-Progress status
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          MColor.primaryNavy.withValues(alpha:0.05),
+                          MColor.primaryNavy.withValues(alpha:0.03)
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      border: Border.all(
+                        color: MColor.primaryNavy.withValues(alpha:0.08),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                            Icons.payments_rounded,
+                            color: MColor.primaryNavy.withValues(alpha:0.8),
+                            size: 18
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            "\$${(ride.fareEstimate ?? ride.fareFinal).toStringAsFixed(2)}"
+                                "${(ride.tip != null && ride.tip! > 0) ? " + \$${ride.tip!.toStringAsFixed(2)} Tip" : ""}",
+                            style: TextStyle(
+                              color: MColor.primaryNavy,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Obx(() {
+                  if (!(rideController.isOnStop.value || isInProgress)) {
+                    return const SizedBox.shrink();
+                  }
+                  return ElevatedButton(
+                    onPressed: rideController.isProcessingRequest.value
+                        ? null
+                        : () => rideController.toggleRideStatus(ride.rideId),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: MColor.primaryNavy,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: rideController.isProcessingRequest.value
+                        ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                        : Row(
+                      children: [
+                        Icon(
+                          rideController.isOnStop.value
+                              ? Icons.play_arrow_rounded
+                              : Icons.pause_rounded,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          rideController.isOnStop.value ? "Resume" : "Pause",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
         ],
       ),
     );
@@ -289,6 +519,16 @@ class RideWidget extends StatelessWidget {
         icon = Icons.schedule_rounded;
         label = 'Waiting';
         color = MColor.primaryNavy.withValues(alpha:0.8);
+        break;
+      case 'Pending':
+        icon = Icons.pending_rounded;
+        label = 'Pending';
+        color = Colors.orange.shade700;
+        break;
+      case 'Arrived':
+        icon = Icons.check_circle_rounded;
+        label = 'Arrived';
+        color = Colors.green.shade700;
         break;
       case 'In-Progress':
         icon = Icons.directions_car_rounded;
@@ -396,10 +636,11 @@ class RideWidget extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: MColor.primaryNavy.withValues(alpha:0.08),
+          color: MColor.primaryNavy.withValues(alpha:0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: MColor.primaryNavy.withValues(alpha:0.2), width: 1),
         ),
         child: Icon(icon, color: MColor.primaryNavy, size: 18),
       ),
@@ -416,7 +657,7 @@ class RideWidget extends StatelessWidget {
 
     if (chatCtrl != null) {
       chatCtrl.updateRideInfo(
-        rideId: ride.rideId ?? '',
+        rideId: ride.rideId,
         driverId: ride.passengerId,
         driverName: ride.passengerName,
       );
@@ -425,7 +666,7 @@ class RideWidget extends StatelessWidget {
       }
     } else {
       Get.toNamed(AppRoutes.chatScreen, arguments: {
-        'rideId': ride.rideId ?? '',
+        'rideId': ride.rideId,
         'driverId': ride.passengerId,
         'driverName': ride.passengerName,
       });

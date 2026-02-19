@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:pick_u_driver/core/notification_sound_service.dart';
+import 'package:pick_u_driver/routes/app_routes.dart';
 
 class ChatNotificationService extends GetxService {
   static ChatNotificationService get to => Get.find();
@@ -23,7 +24,7 @@ class ChatNotificationService extends GetxService {
   /// Initialize notification settings
   Future<void> _initializeNotifications() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@mipmap/ic_notification');
 
     const DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings(
@@ -43,9 +44,9 @@ class ChatNotificationService extends GetxService {
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
 
-    print('🔔 SAHAr Notification service initialized');
+    print('🔔 SAHAr Chat Notification service initialized');
 
-    // Refresh permission flag so notifications can work even before chat screen opens.
+    // Refresh permission flag so notifications can work even before chat screen opens
     try {
       await checkNotificationPermission();
     } catch (e) {
@@ -53,13 +54,18 @@ class ChatNotificationService extends GetxService {
     }
   }
 
-  /// Handle notification tap
+  /// Handle notification tap - navigate to chat screen with ride ID
   void _onNotificationTap(NotificationResponse notificationResponse) {
     final String? payload = notificationResponse.payload;
-    if (payload != null) {
-      print('🔔 SAHAr Notification tapped with payload: $payload');
-      // Navigate to chat screen with the ride ID from payload
-      // You can parse the payload and navigate accordingly
+    if (payload != null && payload.isNotEmpty) {
+      print('🔔 SAHAr Chat notification tapped with rideId: $payload');
+
+      // Navigate to chat screen with the ride ID
+      try {
+        Get.toNamed(AppRoutes.chatScreen, arguments: payload);
+      } catch (e) {
+        print('❌ SAHAr Error navigating to chat screen: $e');
+      }
     }
   }
 
@@ -77,21 +83,21 @@ class ChatNotificationService extends GetxService {
 
       if (status.isGranted) {
         isNotificationPermissionGranted.value = true;
-        print('✅ SAHAr Notification permission granted');
+        print('✅ SAHAr Chat notification permission granted');
         return true;
       } else if (status.isDenied) {
         isNotificationPermissionGranted.value = false;
-        print('❌ SAHAr Notification permission denied');
+        print('❌ SAHAr Chat notification permission denied');
         return false;
       } else if (status.isPermanentlyDenied) {
         isNotificationPermissionGranted.value = false;
-        print('❌ SAHAr Notification permission permanently denied');
+        print('❌ SAHAr Chat notification permission permanently denied');
         return false;
       }
 
       return false;
     } catch (e) {
-      print('❌ SAHAr Error requesting notification permission: $e');
+      print('❌ SAHAr Error requesting chat notification permission: $e');
       return false;
     }
   }
@@ -103,7 +109,7 @@ class ChatNotificationService extends GetxService {
       isNotificationPermissionGranted.value = status.isGranted;
       return status.isGranted;
     } catch (e) {
-      print('❌ SAHAr Error checking notification permission: $e');
+      print('❌ SAHAr Error checking chat notification permission: $e');
       return false;
     }
   }
@@ -127,15 +133,17 @@ class ChatNotificationService extends GetxService {
     }
 
     try {
-      // Play notification sound
+      // Play custom notification sound via NotificationSoundService
+      // This prevents sound overlap with system notification sound
       try {
         if (Get.isRegistered<NotificationSoundService>()) {
-          NotificationSoundService.to.playNotificationSound();
+          await NotificationSoundService.to.playNotificationSound();
         }
       } catch (e) {
         print('⚠️ SAHAr Could not play notification sound: $e');
       }
 
+      // Configure notification WITHOUT system sound to prevent overlap
       const AndroidNotificationDetails androidPlatformChannelSpecifics =
           AndroidNotificationDetails(
         'chat_messages', // channel id
@@ -145,9 +153,10 @@ class ChatNotificationService extends GetxService {
         priority: Priority.high,
         showWhen: true,
         enableVibration: true,
-        playSound: true, // Sound is played via NotificationSoundService, so use default system sound here
-        largeIcon: const DrawableResourceAndroidBitmap('@mipmap/launcher_icon'), // Use app icon as large icon
+        playSound: false, // Disabled to prevent overlap - sound played via NotificationSoundService
         styleInformation: BigTextStyleInformation(''),
+        category: AndroidNotificationCategory.message,
+        icon: '@drawable/ic_notification', // Use small icon for notification
       );
 
       const DarwinNotificationDetails iOSPlatformChannelSpecifics =
@@ -164,15 +173,15 @@ class ChatNotificationService extends GetxService {
 
       await _flutterLocalNotificationsPlugin.show(
         DateTime.now().millisecondsSinceEpoch.remainder(100000),
-        'New message from $senderName',
+        'Message from Passenger',
         message,
         platformChannelSpecifics,
-        payload: rideId,
+        payload: rideId, // Pass rideId for navigation
       );
 
-      print('🔔 SAHAr Notification shown for message from $senderName');
+      print('🔔 SAHAr Chat notification shown for message from $senderName');
     } catch (e) {
-      print('❌ SAHAr Error showing notification: $e');
+      print('❌ SAHAr Error showing chat notification: $e');
     }
   }
 

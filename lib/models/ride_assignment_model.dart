@@ -48,7 +48,7 @@ class RideAssignment {
       fareEstimate: json['fareEstimate'] != null
           ? (json['fareEstimate'] is num ? (json['fareEstimate'] as num).toDouble() : double.tryParse(json['fareEstimate'].toString()))
           : null,
-      fareFinal: (json['fareFinal'] ?? json['fareEstimate'] ?? 0).toDouble(),
+      fareFinal: _parseFareFinal(json),
       createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
       status: json['status'] ?? 'Waiting',
       passengerId: json['passengerId'] ?? '',
@@ -69,6 +69,30 @@ class RideAssignment {
           ? (json['tip'] is num ? (json['tip'] as num).toDouble() : double.tryParse(json['tip'].toString()))
           : null,
     );
+  }
+
+  // Helper method to safely parse fareFinal with fallback to fareEstimate
+  static double _parseFareFinal(Map<String, dynamic> json) {
+    // First try to parse fareFinal
+    if (json['fareFinal'] != null) {
+      if (json['fareFinal'] is num) {
+        return (json['fareFinal'] as num).toDouble();
+      }
+      final parsed = double.tryParse(json['fareFinal'].toString());
+      if (parsed != null) return parsed;
+    }
+
+    // Fall back to fareEstimate
+    if (json['fareEstimate'] != null) {
+      if (json['fareEstimate'] is num) {
+        return (json['fareEstimate'] as num).toDouble();
+      }
+      final parsed = double.tryParse(json['fareEstimate'].toString());
+      if (parsed != null) return parsed;
+    }
+
+    // Default to 0.0
+    return 0.0;
   }
 
   // Helper method to get the display fare

@@ -668,6 +668,29 @@ class ApiProvider extends GetConnect {
     }
   }
 
+  // Set driver available API - POST request
+  Future<Response> setDriverAvailable(String driverId) async {
+    try {
+      print(' SAHAr 🚀 ApiProvider: Setting driver available for ID: $driverId');
+      print(' SAHAr 📍 ApiProvider: Endpoint: /api/driver/set-available/$driverId');
+
+      final response = await postData('/api/drivers/set-available/$driverId', {});
+
+      print(' SAHAr 📋 ApiProvider: Set available response received');
+      print(' SAHAr 📊 ApiProvider: Response status code: ${response.statusCode}');
+      print(' SAHAr 📄 ApiProvider: Response body: ${response.body}');
+
+      return response;
+    } catch (e, stackTrace) {
+      print(' SAHAr 💥 ApiProvider: Set available exception: $e');
+      print(' SAHAr 📍 ApiProvider: Stack trace: $stackTrace');
+
+      return Response(
+        statusCode: 500,
+        statusText: 'Network error. Please check your connection.',
+      );
+    }
+  }
 
 
 }

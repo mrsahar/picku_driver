@@ -17,10 +17,11 @@ class ApiProvider extends GetConnect {
   void onInit() {
     super.onInit();
 
-    // Configure base URL - make sure it's set properly
-    final baseUrl = _globalVars.baseUrl;
-    print(' SAHAr 🔧 ApiProvider onInit: Setting base URL to: $baseUrl');
-    httpClient.baseUrl = baseUrl;
+    // Configure base URL
+    httpClient.baseUrl = _globalVars.baseUrl;
+
+    // ✅ Global 50 second timeout for ALL requests
+    httpClient.timeout = const Duration(seconds: 50);
 
     // Add request interceptor
     httpClient.addRequestModifier<dynamic>((request) {
@@ -46,30 +47,16 @@ class ApiProvider extends GetConnect {
       print('SAHAr: Setting loading true');
       _globalVars.setLoading(true);
 
-      // Check if base URL is properly set
+      // Ensure base URL is always in sync
       final currentBaseUrl = _globalVars.baseUrl;
-      print('SAHAr: Current base URL: $currentBaseUrl');
-      print('SAHAr: HttpClient base URL: ${httpClient.baseUrl}');
-
-      // Ensure base URL is set on httpClient
       if (httpClient.baseUrl != currentBaseUrl) {
-        print('SAHAr: Updating httpClient base URL');
         httpClient.baseUrl = currentBaseUrl;
       }
 
       print('SAHAr: Sending GET request to $endpoint');
       print('SAHAr: Full URL will be: ${httpClient.baseUrl}$endpoint');
 
-      final response = await get(endpoint).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          print('SAHAr: Timeout occurred');
-          return Response(
-            statusCode: 408,
-            statusText: 'Request timeout. Please try again.',
-          );
-        },
-      );
+      final response = await get(endpoint);
 
       print('SAHAr: Response received with status ${response.statusCode}');
       _globalVars.setLoading(false);

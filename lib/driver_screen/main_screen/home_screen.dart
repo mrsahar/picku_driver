@@ -471,7 +471,7 @@ class _HomeScreenState extends State<HomeScreen> {
               myLocationEnabled: false,
               zoomControlsEnabled: false,
               markers: combinedMarkers,
-              polylines: polylines,
+              polylines: polylines.toSet(), // .toSet() lagane se UI lazmi update hoga
               onMapCreated: (GoogleMapController controller) {
                 _mapService.setMapController(controller);
                 print('✅ SAHAr Map controller set');

@@ -177,7 +177,7 @@ class RideWidget extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          // ── Fare + Action Button / Slide to Arrive / Slide to Start
+          // ── Fare + Action Button / Slide to Arrive / Arrived Banner
           if (ride.status == "Waiting" || ride.status == "Pending")
             // Show "Slide to Arrive" for Waiting/Pending status
             Column(
@@ -224,41 +224,73 @@ class RideWidget extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Slide to Arrive - Clean Design
+
+                // ── Slide to Arrive — Compact Design
                 Container(
-                  height: 44,
+                  height: 56,
                   decoration: BoxDecoration(
-                    color: Colors.white, // Clean white background instead of dark gray
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                      color: MColor.primaryNavy.withValues(alpha:0.15),
-                      width: 1.5,
-                    ),
+                    color: MColor.primaryNavy,
+                    borderRadius: BorderRadius.circular(28), // full pill shape
+                    boxShadow: [
+                      BoxShadow(
+                        color: MColor.primaryNavy.withValues(alpha: 0.3),
+                        blurRadius: 20,
+                        spreadRadius: 0,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
                   child: ActionSlider.standard(
                     sliderBehavior: SliderBehavior.stretch,
                     width: double.infinity,
-                    height: 44,
+                    height: 56,
                     backgroundColor: Colors.transparent,
-                    toggleColor: MColor.primaryNavy,
+                    toggleColor: Colors.transparent,
                     borderWidth: 0,
-                    icon: Icon(
-                      Icons.arrow_forward_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                    loadingIcon: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
+                    icon: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
                         color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 12,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child:   Icon(
+                        Icons.arrow_forward_rounded,
+                        color: MColor.primaryNavy,
+                        size: 20,
                       ),
                     ),
-                    successIcon: Icon(
-                      Icons.check_rounded,
-                      color: Colors.white,
-                      size: 18,
+                    loadingIcon: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: Padding(
+                        padding: const EdgeInsets.all(13),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: MColor.primaryNavy,
+                          backgroundColor: Colors.white.withValues(alpha: 0.3),
+                        ),
+                      ),
+                    ),
+                    successIcon: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                      child:   Icon(
+                        Icons.check_rounded,
+                        color: MColor.primaryNavy,
+                        size: 20,
+                      ),
                     ),
                     action: (controller) async {
                       if (rideController.isArriving.value) {
@@ -268,24 +300,20 @@ class RideWidget extends StatelessWidget {
                       controller.loading();
                       await rideController.markAsArrived(ride.rideId);
                       controller.success();
-                      await Future.delayed(const Duration(milliseconds: 500));
+                      await Future.delayed(const Duration(milliseconds: 600));
                       controller.reset();
                     },
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          color: MColor.primaryNavy,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Slide to Arrive',
+                        const SizedBox(width: 40), // breathing room from thumb
+                        const Text(
+                          'Slide to arrive',
                           style: TextStyle(
-                            color: MColor.primaryNavy,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14,
+                            letterSpacing: 0.3,
                           ),
                         ),
                       ],
@@ -295,119 +323,72 @@ class RideWidget extends StatelessWidget {
               ],
             )
           else if (ride.status == "Arrived")
-            // Show "Slide to Start Ride" for Arrived status
-            Column(
-              children: [
-                // Fare display for Arrived status
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.green.withValues(alpha:0.05),
-                        Colors.green.withValues(alpha:0.03)
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    border: Border.all(
-                      color: Colors.green.withValues(alpha:0.2),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                          Icons.check_circle_outline,
-                          color: Colors.green.shade700,
-                          size: 18
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          "You've arrived at pickup location",
-                          style: TextStyle(
-                            color: Colors.green.shade700,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+            // Show only the Arrived banner — no slider
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  colors: [
+                    MColor.primaryNavy,
+                    MColor.primaryNavy,
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
                 ),
-                const SizedBox(height: 12),
-                // Slide to Start Ride - Green Design
-                Container(
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                      color: Colors.green.withValues(alpha:0.3),
-                      width: 1.5,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_circle_rounded,
+                      color: Colors.white,
+                      size: 20,
                     ),
                   ),
-                  child: ActionSlider.standard(
-                    sliderBehavior: SliderBehavior.stretch,
-                    width: double.infinity,
-                    height: 44,
-                    backgroundColor: Colors.transparent,
-                    toggleColor: Colors.green.shade700,
-                    borderWidth: 0,
-                    icon: Icon(
-                      Icons.arrow_forward_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                    loadingIcon: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    ),
-                    successIcon: Icon(
-                      Icons.check_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                    action: (controller) async {
-                      if (rideController.isStartingRide.value) {
-                        controller.reset();
-                        return;
-                      }
-                      controller.loading();
-                      await rideController.startRide(ride.rideId);
-                      controller.success();
-                      await Future.delayed(const Duration(milliseconds: 500));
-                      controller.reset();
-                    },
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          Icons.play_arrow_rounded,
-                          color: Colors.green.shade700,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Slide to Start Ride',
+                        const Text(
+                          "Arrived at Pickup",
                           style: TextStyle(
-                            color: Colors.green.shade700,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          "Waiting for passenger to board",
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 12,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                  Icon(
+                    Icons.directions_car_rounded,
+                    color: Colors.white.withValues(alpha: 0.7),
+                    size: 26,
+                  ),
+                ],
+              ),
             )
           else
             // Show Fare + Pause/Resume for In-Progress status

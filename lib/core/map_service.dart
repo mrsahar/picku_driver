@@ -193,6 +193,9 @@ class MapService extends GetxService with WidgetsBindingObserver {
   void updateDriverMarker(double lat, double lng) {
     final newPosition = LatLng(lat, lng);
 
+    // ✅ Har location update par peechay se line remove hogi (Uber Style)
+    _trimPolyline(newPosition);
+
     if (_lastPosition == null) {
       _lastPosition = newPosition;
       _lastBearing = 0;
@@ -371,6 +374,54 @@ class MapService extends GetxService with WidgetsBindingObserver {
     final driver = markers.firstWhereOrNull((m) => m.markerId.value == 'current_location');
     markers.clear();
     if (driver != null) markers.add(driver);
+  }
+
+  /// Polyline ko peeche se trim karne ka function (Uber Style)
+  void _trimPolyline(LatLng driverPosition) {
+    if (polylines.isEmpty) return;
+
+    Polyline currentLine = polylines.first;
+    List<LatLng> points = List.from(currentLine.points);
+
+    // Kam az kam 2 points chahiye line banaye rakhne ke liye
+    if (points.length < 2) return;
+
+    int closestIndex = 0;
+    double minDistance = double.infinity;
+
+    // Performance ke liye sirf shuru ke 15 points check karein
+    int checkLimit = math.min(15, points.length);
+
+    for (int i = 0; i < checkLimit; i++) {
+      double dist = _calculateAccurateDistance(driverPosition, points[i]);
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestIndex = i;
+      }
+    }
+
+    // Agar driver polyline ke point ke 30 meters ke andar hai, to peeche wale points remove kar dein
+    if (minDistance < 30.0 && closestIndex > 0) {
+      points.removeRange(0, closestIndex);
+
+      // Driver ki current location ko start point bana dein taa ke line gaari se judi rahay
+      points.insert(0, driverPosition);
+
+      // UI update karein
+      polylines.assignAll({currentLine.copyWith(pointsParam: points)});
+    }
+  }
+
+  /// Do coordinates ke darmiyan accurate meters calculate karne ke liye Haversine Formula
+  double _calculateAccurateDistance(LatLng p1, LatLng p2) {
+    var p = 0.017453292519943295; // Math.PI / 180
+    var a = 0.5 -
+        math.cos((p2.latitude - p1.latitude) * p) / 2 +
+        math.cos(p1.latitude * p) *
+            math.cos(p2.latitude * p) *
+            (1 - math.cos((p2.longitude - p1.longitude) * p)) /
+            2;
+    return 12742000 * math.asin(math.sqrt(a)); // Returns distance in meters
   }
 
   @override

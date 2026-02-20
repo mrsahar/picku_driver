@@ -92,12 +92,12 @@ class BackgroundTrackingService extends GetxService {
   Timer? _reconnectionTimer;
   StreamSubscription<bool>? _connectivitySubscription;
 
-  // Route update throttling
-  DateTime? _lastRouteUpdateTime;
-  LatLng? _lastRouteUpdatePosition;
-  static const double _routeUpdateDistanceThreshold = 50.0; // meters
-  static const Duration _routeUpdateTimeThreshold = Duration(seconds: 10); // ✅ Update every 10 seconds (like Uber)
-  
+  // Route update throttling — DISABLED (Step 3 comment out hai, ye variables ab use nahi)
+  // DateTime? _lastRouteUpdateTime;
+  // LatLng? _lastRouteUpdatePosition;
+  // static const double _routeUpdateDistanceThreshold = 50.0; // meters
+  // static const Duration _routeUpdateTimeThreshold = Duration(seconds: 10);
+
   // Prevent concurrent route updates
   bool _isUpdatingRoute = false;
   
@@ -230,16 +230,15 @@ class BackgroundTrackingService extends GetxService {
 
     try {
       _isUpdatingRoute = true;
-      
-      // Reset route update tracking so it updates immediately
-      _lastRouteUpdatePosition = null;
-      _lastRouteUpdateTime = null;
+
+      // Route update tracking variables disabled (Step 3 comment out hai)
 
       // ✅ OPTIMIZATION: Debounce route updates to prevent rapid rebuilds
       await Future.delayed(const Duration(milliseconds: 300));
 
       // Trigger route update based on current ride status
-      if (ride.status == 'Waiting') {
+      // Note: _isUpdatingRoute guard is managed inside each function
+      if (ride.status == 'Waiting' || ride.status == 'Arrived') {
         await _showRouteToPickup(ride);
       } else if (ride.status == 'In-Progress') {
         await _showRouteToAllStops(ride);
@@ -1560,7 +1559,7 @@ class BackgroundTrackingService extends GetxService {
   }
 
   /// Show route to pickup with custom markers
-  Future<void> _showRouteToPickup(RideAssignment ride) async {
+  Future<void> _showRouteToPickup(RideAssignment ride, {int retryCount = 0}) async {
     // Prevent concurrent updates
     if (_isUpdatingRoute) {
       print('⏸️ SAHAr Route update already in progress, skipping...');
@@ -1571,31 +1570,38 @@ class BackgroundTrackingService extends GetxService {
     try {
       if (_locationService == null) {
         print('⚠️ SAHAr Location service is null, cannot show route to pickup');
-        // Retry after a delay
-        Future.delayed(const Duration(seconds: 2), () {
-          if (_locationService != null) {
-            _showRouteToPickup(ride);
-          }
-        });
         _isUpdatingRoute = false;
+        // Retry after a delay (max 5 retries)
+        if (retryCount < 5) {
+          Future.delayed(const Duration(seconds: 2), () {
+            _showRouteToPickup(ride, retryCount: retryCount + 1);
+          });
+        }
         return;
       }
       
       // Try to get current location with retries
-      int retries = 3;
-      while (retries > 0) {
+      int locRetries = 5;
+      while (locRetries > 0) {
         await _locationService!.getCurrentLocation();
         if (_locationService!.currentLatLng.value != null) {
           break;
         }
-        retries--;
-        if (retries > 0) {
-          await Future.delayed(const Duration(milliseconds: 500));
+        locRetries--;
+        if (locRetries > 0) {
+          await Future.delayed(const Duration(milliseconds: 800));
         }
       }
       
       if (_locationService!.currentLatLng.value == null) {
-        print('⚠️ SAHAr Current location is null after retries, cannot show route to pickup');
+        print('⚠️ SAHAr Current location is null after retries, scheduling retry for route to pickup (attempt ${retryCount + 1})');
+        _isUpdatingRoute = false;
+        // Schedule a retry after 3 seconds (max 5 retries)
+        if (retryCount < 5) {
+          Future.delayed(const Duration(seconds: 3), () {
+            _showRouteToPickup(ride, retryCount: retryCount + 1);
+          });
+        }
         return;
       }
 
@@ -1603,12 +1609,12 @@ class BackgroundTrackingService extends GetxService {
       final pickup = LatLng(ride.pickUpLat, ride.pickUpLon);
 
       // ✅ Draw route from driver to pickup (only 1 polyline)
-      // NOTE: useStraightLineOnError=false so that on API failure we keep the
-      // existing polyline instead of replacing it with a synthetic straight line.
+      // NOTE: useStraightLineOnError=true so that even if Directions API fails
+      // on first ride assignment, a straight-line fallback polyline is shown.
       final points = await GoogleDirectionsService.getRoutePoints(
         origin: origin,
         destination: pickup,
-        useStraightLineOnError: false,
+        useStraightLineOnError: true,
       );
 
       _setPolyline(points, Colors.orange);
@@ -1656,7 +1662,7 @@ class BackgroundTrackingService extends GetxService {
       }
       
       // Try to get current location with retries
-      int retries = 3;
+      int retries = 5;
       while (retries > 0) {
         await _locationService!.getCurrentLocation();
         if (_locationService!.currentLatLng.value != null) {
@@ -1711,7 +1717,7 @@ class BackgroundTrackingService extends GetxService {
         origin: origin,
         destination: finalDestination,
         waypoints: waypoints.isNotEmpty ? waypoints : null,
-        useStraightLineOnError: false,
+        useStraightLineOnError: true,
       );
 
       // Draw single polyline showing complete route through all stops
@@ -2090,32 +2096,24 @@ class BackgroundTrackingService extends GetxService {
     return shouldSend;
   }
 
-  /// Check if route should be updated (throttled to save API costs)
-  bool _shouldUpdateRoute(Position position) {
-    if (_lastRouteUpdatePosition == null || _lastRouteUpdateTime == null) {
-      return true; // First update
-    }
-
-    if (_locationService == null) return false;
-
-    // Check distance threshold (50 meters)
-    double distance = _locationService!.calculateDistance(
-      LatLng(_lastRouteUpdatePosition!.latitude, _lastRouteUpdatePosition!.longitude),
-      LatLng(position.latitude, position.longitude),
-    );
-
-    if (distance >= _routeUpdateDistanceThreshold) {
-      return true; // Driver moved >50m from last route update
-    }
-
-    // Check time threshold (45 seconds)
-    Duration timeSinceLastUpdate = DateTime.now().difference(_lastRouteUpdateTime!);
-    if (timeSinceLastUpdate >= _routeUpdateTimeThreshold) {
-      return true; // 45 seconds passed since last update
-    }
-
-    return false; // No update needed
-  }
+  // ℹ️ DISABLED: _shouldUpdateRoute ab use nahi ho rahi kyunke
+  // Step 3 (periodic API route update) comment out kar diya gaya hai.
+  // Polyline trimming ab map_service.dart mein mathematically ho rahi hai.
+  //
+  // bool _shouldUpdateRoute(Position position) {
+  //   if (_lastRouteUpdatePosition == null || _lastRouteUpdateTime == null) {
+  //     return true;
+  //   }
+  //   if (_locationService == null) return false;
+  //   double distance = _locationService!.calculateDistance(
+  //     LatLng(_lastRouteUpdatePosition!.latitude, _lastRouteUpdatePosition!.longitude),
+  //     LatLng(position.latitude, position.longitude),
+  //   );
+  //   if (distance >= _routeUpdateDistanceThreshold) return true;
+  //   Duration timeSinceLastUpdate = DateTime.now().difference(_lastRouteUpdateTime!);
+  //   if (timeSinceLastUpdate >= _routeUpdateTimeThreshold) return true;
+  //   return false;
+  // }
 
   /// Start location updates
   Future<void> _startLocationUpdates() async {
@@ -2157,96 +2155,26 @@ class BackgroundTrackingService extends GetxService {
         // ---------------------------------------------------------
         // 3. Route Update (Dynamic - Like Uber) ✅
         // ---------------------------------------------------------
-        // Check karein ke ride chal rahi hai ya nahi
-        if (currentRide.value != null && !_isUpdatingRoute) {
-          // Update route every 10 seconds OR 50 meters (whichever comes first)
-          if (_shouldUpdateRoute(position)) {
-            // Prevent concurrent updates
-            if (_isUpdatingRoute) return;
-            _isUpdatingRoute = true;
-            
-            try {
-              // ✅ Driver ki CURRENT location (from taxi marker)
-              LatLng driverKiJaga = LatLng(position.latitude, position.longitude);
-              LatLng manzil; // Kahan jana hai (final destination)
-              List<LatLng>? waypoints; // Intermediate stops
-              Color routeColor;
+        // ℹ️  DISABLED: Ab har 10 seconds baad Google Directions API call nahi hogi.
+        // Polyline ko mathematically trim karne ka kaam map_service.dart ke
+        // _trimPolyline() function mein ho raha hai (Haversine formula se).
+        // Naya route sirf tab mangwaya jaye ga jab ride status change ho —
+        // jo ke _updateUIForRideStatus() mein handle ho raha hai.
+        // Is se Google Directions API quota protect hoga aur bill control mein rahega.
 
-              if (rideStatus.value == 'Waiting' || rideStatus.value == 'Pending' || rideStatus.value == 'Arrived') {
-                // Phase 1: Agar passenger ko lene ja raha hai - direct to pickup
-                manzil = LatLng(currentRide.value!.pickUpLat, currentRide.value!.pickUpLon);
-                waypoints = null; // No waypoints, direct route
-                routeColor = rideStatus.value == 'Arrived' ? Colors.green : Colors.orange;
-
-                print('🟠 SAHAr Phase 1 (${rideStatus.value}): Route to Pickup Location');
-              } else if (rideStatus.value == 'In-Progress') {
-                // Phase 2: Route to final destination through ALL remaining stops
-
-                // Sort stops by stopOrder to ensure correct sequence
-                final sortedStops = List<RideStop>.from(currentRide.value!.stops)
-                  ..sort((a, b) => a.stopOrder.compareTo(b.stopOrder));
-
-                if (sortedStops.isNotEmpty) {
-                  // Final destination is the LAST stop
-                  final lastStop = sortedStops.last;
-                  manzil = LatLng(lastStop.latitude, lastStop.longitude);
-
-                  // All stops EXCEPT the last are waypoints
-                  waypoints = sortedStops.length > 1
-                      ? sortedStops
-                          .sublist(0, sortedStops.length - 1)
-                          .map((stop) => LatLng(stop.latitude, stop.longitude))
-                          .toList()
-                      : null;
-
-                  print('🔵 SAHAr Phase 2 (In-Progress): Route with ${waypoints?.length ?? 0} waypoints to final destination');
-                } else {
-                  // Fallback to dropoff if no stops
-                  manzil = LatLng(currentRide.value!.dropoffLat, currentRide.value!.dropoffLon);
-                  waypoints = null;
-
-                  print('🔵 SAHAr Phase 2 (In-Progress): Direct route to dropoff (no stops)');
-                }
-
-                routeColor = MColor.primaryNavy;
-              } else {
-                // Ride status not active, skip route update
-                _isUpdatingRoute = false;
-                return;
-              }
-
-              print('🔄 SAHAr Fetching new route from driver to destination...');
-              print('   Origin: ${driverKiJaga.latitude}, ${driverKiJaga.longitude}');
-              print('   Waypoints: ${waypoints?.length ?? 0}');
-              print('   Destination: ${manzil.latitude}, ${manzil.longitude}');
-
-              // ✅ Route from CURRENT driver position to final destination with waypoints
-              // This creates fresh polyline every 10 seconds/50 meters showing complete remaining path
-              // NOTE: useStraightLineOnError=false so that on API failure we keep
-              // the existing polyline (no sudden straight-line artifact).
-              final points = await GoogleDirectionsService.getRoutePoints(
-                origin: driverKiJaga,
-                destination: manzil,
-                waypoints: waypoints,
-                useStraightLineOnError: false,
-              );
-
-              // ✅ CENTRALIZED: Remove old polyline and draw new one
-              _setPolyline(points, routeColor);
-
-              // Update throttling variables after successful route update
-              _lastRouteUpdateTime = DateTime.now();
-              _lastRouteUpdatePosition = driverKiJaga;
-
-              print('✅ SAHAr Route updated from driver position (${points.length} points, ${waypoints?.length ?? 0} waypoints)');
-              print('🔄 SAHAr Next update in 10 seconds or 50 meters');
-            } catch (e) {
-              print('❌ SAHAr Error updating route: $e');
-            } finally {
-              _isUpdatingRoute = false;
-            }
-          }
-        }
+        // if (currentRide.value != null && !_isUpdatingRoute) {
+        //   if (_shouldUpdateRoute(position)) {
+        //     if (_isUpdatingRoute) return;
+        //     _isUpdatingRoute = true;
+        //     try {
+        //       ... route update API logic ...
+        //     } catch (e) {
+        //       print('❌ SAHAr Error updating route: $e');
+        //     } finally {
+        //       _isUpdatingRoute = false;
+        //     }
+        //   }
+        // }
       },
       onError: (error) => print('❌ SAHAr Position stream error: $error'),
     );

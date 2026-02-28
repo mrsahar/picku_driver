@@ -6,6 +6,7 @@ import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/providers/api_provider.dart';
 import 'package:pick_u_driver/core/background_tracking_service.dart';
 import 'package:pick_u_driver/core/global_variables.dart';
+import 'package:pick_u_driver/core/unified_signalr_service.dart';
 
 import '../models/user_profile_model.dart';
 
@@ -132,6 +133,16 @@ class ProfileController extends GetxController {
           }
         } catch (e) {
           print(' SAHAr ⚠️ Error stopping background service: $e');
+        }
+
+        // Step 2b: Stop flutter_background_service (SignalR + Location isolate)
+        try {
+          if (Get.isRegistered<UnifiedSignalRService>()) {
+            await UnifiedSignalRService.to.stopBackgroundServiceIfRunning();
+            print(' SAHAr ✅ Background SignalR service stopped');
+          }
+        } catch (e) {
+          print(' SAHAr ⚠️ Error stopping background SignalR service: $e');
         }
 
         // Step 3: Clear GlobalVariables token and user data

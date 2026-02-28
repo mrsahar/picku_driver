@@ -347,6 +347,176 @@ class RideController extends GetxController {
     }
   }
 
+  // Cancel ride (passenger no-show)
+  Future<void> cancelRide(String rideId, {String reason = 'Passenger no-show'}) async {
+    if (isProcessingRequest.value) return;
+
+    try {
+      isProcessingRequest.value = true;
+      final endpoint = '/api/Ride/cancel-ride?rideId=$rideId';
+      print("SAHAr - CancelRide: Endpoint => $endpoint, Reason: $reason");
+
+      final response = await _apiProvider.postData(endpoint, {'reason': reason});
+      print("SAHAr - CancelRide: Response => ${response.statusCode} ${response.statusText}");
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        HapticFeedback.mediumImpact();
+        print("SAHAr - CancelRide: Successfully cancelled ride");
+
+        try {
+          final backgroundService = Get.find<BackgroundTrackingService>();
+          if (backgroundService.currentRide.value != null) {
+            final current = backgroundService.currentRide.value!;
+            final updatedRide = RideAssignment(
+              rideId: current.rideId,
+              rideType: current.rideType,
+              fareEstimate: current.fareEstimate,
+              fareFinal: current.fareFinal,
+              createdAt: current.createdAt,
+              status: 'Cancelled',
+              passengerId: current.passengerId,
+              passengerName: current.passengerName,
+              passengerPhone: current.passengerPhone,
+              pickupLocation: current.pickupLocation,
+              pickUpLat: current.pickUpLat,
+              pickUpLon: current.pickUpLon,
+              dropoffLocation: current.dropoffLocation,
+              dropoffLat: current.dropoffLat,
+              dropoffLon: current.dropoffLon,
+              stops: current.stops,
+              passengerCount: current.passengerCount,
+              payment: current.payment,
+              tip: current.tip,
+            );
+            backgroundService.currentRide.value = updatedRide;
+            backgroundService.rideStatus.value = 'Cancelled';
+
+            // Reset the ride back to available state
+            backgroundService.triggerCancelledFlow();
+
+            print("SAHAr - CancelRide: Local ride status updated to 'Cancelled'");
+          }
+        } catch (e) {
+          print("SAHAr - CancelRide: Failed to update local status: $e");
+        }
+
+        resetTimers();
+
+        Get.snackbar(
+          "Ride Cancelled",
+          "The ride has been cancelled due to passenger no-show",
+          backgroundColor: Colors.orange.withValues(alpha: 0.1),
+          colorText: Colors.orange.shade800,
+          icon: Icon(Icons.cancel_outlined, color: Colors.orange.shade800),
+          duration: const Duration(seconds: 4),
+        );
+      } else {
+        print("SAHAr - CancelRide: Failed => ${response.statusText}");
+        Get.snackbar(
+          "Error",
+          "Failed to cancel ride: ${response.statusText}",
+          backgroundColor: Colors.red.withValues(alpha: 0.1),
+          colorText: Colors.red,
+          icon: const Icon(Icons.error, color: Colors.red),
+        );
+      }
+    } catch (e) {
+      print("SAHAr - CancelRide: Exception => $e");
+      Get.snackbar(
+        "Error",
+        "Network error: $e",
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
+        colorText: Colors.red,
+        icon: const Icon(Icons.error, color: Colors.red),
+      );
+    } finally {
+      isProcessingRequest.value = false;
+      print("SAHAr - CancelRide: Processing flag reset");
+    }
+  }
+
+  // End the ride after trip completion
+  Future<void> endRide(String rideId) async {
+    if (isProcessingRequest.value) return;
+
+    try {
+      isProcessingRequest.value = true;
+
+      String endpoint = "/api/Ride/$rideId/end";
+      print("SAHAr - EndRide: Endpoint => $endpoint");
+
+      final response = await _apiProvider.postData(endpoint, {});
+      print("SAHAr - EndRide: Response => ${response.statusCode} ${response.statusText}");
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        HapticFeedback.mediumImpact();
+        print("SAHAr - EndRide: Successfully ended ride");
+
+        // Update local ride status to "Completed" and let BackgroundTrackingService handle payment flow
+        try {
+          final backgroundService = Get.find<BackgroundTrackingService>();
+          if (backgroundService.currentRide.value != null) {
+            final current = backgroundService.currentRide.value!;
+            final updatedRide = RideAssignment(
+              rideId: current.rideId,
+              rideType: current.rideType,
+              fareEstimate: current.fareEstimate,
+              fareFinal: current.fareFinal,
+              createdAt: current.createdAt,
+              status: 'Completed',
+              passengerId: current.passengerId,
+              passengerName: current.passengerName,
+              passengerPhone: current.passengerPhone,
+              pickupLocation: current.pickupLocation,
+              pickUpLat: current.pickUpLat,
+              pickUpLon: current.pickUpLon,
+              dropoffLocation: current.dropoffLocation,
+              dropoffLat: current.dropoffLat,
+              dropoffLon: current.dropoffLon,
+              stops: current.stops,
+              passengerCount: current.passengerCount,
+              payment: current.payment,
+              tip: current.tip,
+            );
+            backgroundService.currentRide.value = updatedRide;
+            backgroundService.rideStatus.value = 'Completed';
+
+            // Trigger the completion flow (payment waiting sheet, etc.)
+            backgroundService.triggerCompletedFlow(updatedRide);
+
+            print("SAHAr - EndRide: Local ride status updated to 'Completed'");
+          }
+        } catch (e) {
+          print("SAHAr - EndRide: Failed to update local status: $e");
+        }
+
+        // Reset timers
+        resetTimers();
+      } else {
+        print("SAHAr - EndRide: Failed => ${response.statusText}");
+        Get.snackbar(
+          "Error",
+          "Failed to end ride: ${response.statusText}",
+          backgroundColor: Colors.red.withValues(alpha: 0.1),
+          colorText: Colors.red,
+          icon: const Icon(Icons.error, color: Colors.red),
+        );
+      }
+    } catch (e) {
+      print("SAHAr - EndRide: Exception => $e");
+      Get.snackbar(
+        "Error",
+        "Network error: $e",
+        backgroundColor: Colors.red.withValues(alpha: 0.1),
+        colorText: Colors.red,
+        icon: const Icon(Icons.error, color: Colors.red),
+      );
+    } finally {
+      isProcessingRequest.value = false;
+      print("SAHAr - EndRide: Processing flag reset");
+    }
+  }
+
   // Reset all timers (call this when ride ends)
   void resetTimers() {
     _timer?.cancel();

@@ -20,6 +20,24 @@ class _WhyNeedPermissionScreenState extends State<WhyNeedPermissionScreen> {
   String _errorMessage = '';
 
   @override
+  void initState() {
+    super.initState();
+    // If the permission is already granted, skip straight to the map.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAndAutoNavigate());
+  }
+
+  /// Navigate to MainMap immediately if location permission is already granted.
+  Future<void> _checkAndAutoNavigate() async {
+    try {
+      final geo = await Geolocator.checkPermission();
+      if (geo == LocationPermission.whileInUse || geo == LocationPermission.always) {
+        await _initializePermissionService();
+        if (mounted) Get.offAllNamed(AppRoutes.MainMap);
+      }
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
     var isDark = MediaQuery.of(context).platformBrightness == Brightness.dark;
 
@@ -36,12 +54,11 @@ class _WhyNeedPermissionScreenState extends State<WhyNeedPermissionScreen> {
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
                   // Animated icon container
                   Container(
                     height: 120,
@@ -206,8 +223,7 @@ class _WhyNeedPermissionScreenState extends State<WhyNeedPermissionScreen> {
                       ],
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
           ),
         ),
@@ -285,9 +301,13 @@ class _WhyNeedPermissionScreenState extends State<WhyNeedPermissionScreen> {
           await _showGpsDialog();
         }
 
-        // Navigate to main map
+        // Navigate to main map — use addPostFrameCallback so the GPS dialog
+        // close animation fully finishes before we push a new route, avoiding
+        // the '!_debugLocked' navigator assertion.
         if (mounted) {
-          Get.offAllNamed(AppRoutes.MainMap);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) Get.offAllNamed(AppRoutes.MainMap);
+          });
         }
       } else {
         setState(() {
@@ -379,11 +399,12 @@ class _WhyNeedPermissionScreenState extends State<WhyNeedPermissionScreen> {
       var permissionStatus = await Permission.location.status;
 
       if (geoPermission == LocationPermission.whileInUse ||
-          geoPermission == LocationPermission.always && permissionStatus.isGranted) {
-        // Permission granted, initialize service and navigate
+          (geoPermission == LocationPermission.always && permissionStatus.isGranted)) {
         await _initializePermissionService();
         if (mounted) {
-          Get.offAllNamed(AppRoutes.MainMap);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) Get.offAllNamed(AppRoutes.MainMap);
+          });
         }
       }
     } catch (e) {

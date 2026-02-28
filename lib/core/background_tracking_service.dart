@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -17,7 +18,7 @@ import 'package:pick_u_driver/driver_screen/widget/modern_payment_dialog.dart';
 import 'package:pick_u_driver/models/ride_assignment_model.dart'; 
 import 'package:pick_u_driver/routes/app_routes.dart';
 import 'package:signalr_core/signalr_core.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+// flutter_foreground_task removed — service is managed by flutter_background_service
 import 'package:permission_handler/permission_handler.dart';
 import 'package:pick_u_driver/utils/theme/mcolors.dart';
 import 'package:pick_u_driver/core/map_service.dart';
@@ -91,6 +92,7 @@ class BackgroundTrackingService extends GetxService {
   StreamSubscription<Position>? _positionStream;
   Timer? _reconnectionTimer;
   StreamSubscription<bool>? _connectivitySubscription;
+  final List<StreamSubscription<dynamic>> _bgServiceSubscriptions = [];
 
   // Route update throttling — DISABLED (Step 3 comment out hai, ye variables ab use nahi)
   // DateTime? _lastRouteUpdateTime;
@@ -135,6 +137,46 @@ class BackgroundTrackingService extends GetxService {
     _initializeConnection();
     _loadCustomMarkers();
     _setupConnectivityListener();
+    _listenToBackgroundServiceEvents();
+  }
+
+  /// Listen to events from the background isolate so Service Status Details
+  /// and driver status toggle show correct connection/location state.
+  void _listenToBackgroundServiceEvents() {
+    final service = FlutterBackgroundService();
+    _bgServiceSubscriptions.add(
+      service.on('bg_connectionState').listen((event) {
+        if (event == null) return;
+        final state = event['state']?.toString() ?? '';
+        switch (state) {
+          case 'connected':
+            isConnected.value = true;
+            connectionStatus.value = 'Online';
+            isSubscribed.value = true;
+            break;
+          case 'disconnected':
+            isConnected.value = false;
+            connectionStatus.value = 'Disconnected';
+            isSubscribed.value = false;
+            break;
+          case 'reconnecting':
+            connectionStatus.value = 'Reconnecting...';
+            break;
+          case 'error':
+            isConnected.value = false;
+            connectionStatus.value = 'Error: ${event['error']}';
+            isSubscribed.value = false;
+            break;
+        }
+      }),
+    );
+    _bgServiceSubscriptions.add(
+      service.on('bg_LocationUpdate').listen((event) {
+        if (event == null) return;
+        locationUpdateCount.value++;
+        isLocationSending.value = true;
+      }),
+    );
   }
 
   /// Setup listener for internet connectivity changes
@@ -316,8 +358,17 @@ class BackgroundTrackingService extends GetxService {
   /// Initialize SignalR connection with JWT authentication
   Future<void> _initializeConnection() async {
     try {
-      // Get JWT token from GlobalVariables
-      final jwtToken = GlobalVariables.instance.userToken;
+      // Get JWT token — prefer GlobalVariables (in-memory), fall back to
+      // SharedPreferences to avoid a race condition where GlobalVariables
+      // hasn't finished its async _loadStoredData() yet.
+      String jwtToken = GlobalVariables.instance.userToken;
+      if (jwtToken.isEmpty) {
+        jwtToken = await SharedPrefsService.getUserToken() ?? '';
+        if (jwtToken.isNotEmpty) {
+          // Sync back into GlobalVariables so the rest of the app sees it.
+          GlobalVariables.instance.setUserToken(jwtToken);
+        }
+      }
 
       if (jwtToken.isEmpty) {
         print('⚠️ SAHAr No JWT token available for SignalR connection');
@@ -1825,7 +1876,9 @@ class BackgroundTrackingService extends GetxService {
     }
   }
 
-  /// Reset ride state
+  /// Reset ride state (public so services layer can call it)
+  void resetRide() => _resetRide();
+
   void _resetRide() {
     // ✅ Prevent double-tap - if already resetting, skip
     if (_isResetting) {
@@ -1848,9 +1901,6 @@ class BackgroundTrackingService extends GetxService {
     isWaitingForPayment.value = false;
     paymentCompleted.value = false;
     showPaymentDialog.value = false;
-
-    // ✅ Background tracking and SignalR connection remain active - driver stays ready for next request
-    // No need to stop tracking or disconnect - this is key for seamless Uber-like experience
 
     // ✅ Animate camera back to driver's current position with bearing reset to North (0)
     if (lastSentLocation.value != null && Get.isRegistered<MapService>()) {
@@ -1911,6 +1961,30 @@ class BackgroundTrackingService extends GetxService {
     } catch (e) {
       print('❌ SAHAr [BG] Error subscribing to chat: $e');
     }
+  }
+
+  /// Public method to trigger the completed flow from outside
+  void triggerCompletedFlow(RideAssignment ride) {
+    print('🏁 SAHAr [BG] triggerCompletedFlow called for ride: ${ride.rideId}');
+
+    // 1. Tell the background isolate the ride is done
+    final service = FlutterBackgroundService();
+    service.invoke('stopTracking');
+
+    // 2. Handle the UI logic (Popups, etc.)
+    _showCompletedRide(ride);
+  }
+
+  /// Public method to reset ride after a driver-initiated cancellation
+  void triggerCancelledFlow() {
+    print('🚫 SAHAr [BG] triggerCancelledFlow called - resetting ride');
+
+    // 1. Tell the background isolate to clear the current ride ID
+    final service = FlutterBackgroundService();
+    service.invoke('updateRideId', {'rideId': ''});
+
+    // 2. Reset UI state
+    _resetRide();
   }
 
   /// Public method to start tracking (called by ActiveRideController)
@@ -2263,64 +2337,36 @@ class BackgroundTrackingService extends GetxService {
 
   /// Start background service
   Future<bool> startBackgroundService() async {
-    if (isRunning.value) {
-      print('⚠️ SAHAr Service already running');
-      return true;
-    }
+    if (isRunning.value) return true;
 
     try {
-      // Request location permissions via LocationService
-      if (_locationService != null) {
-        await _locationService!.requestBackgroundPermissions();
+      // 1. Request the correct permissions first
+      final hasNotificationPermission = await requestBackgroundPermissions();
+      if (!hasNotificationPermission) {
+        print('⚠️ SAHAr Notification permission denied — cannot start foreground service');
+        return false;
       }
 
-      // Request notification and battery permissions
-      await requestBackgroundPermissions();
+      // 2. Use the service instance configured in background_service_initializer.dart
+      final service = FlutterBackgroundService();
 
-      FlutterForegroundTask.init(
-        androidNotificationOptions: AndroidNotificationOptions(
-          channelId: 'pickurides_tracking',
-          channelName: 'PickuRides Location Tracking',
-          channelDescription: 'Tracking your location for ride assignments',
-          channelImportance: NotificationChannelImportance.LOW,
-          priority: NotificationPriority.LOW,
-        ),
-        iosNotificationOptions: const IOSNotificationOptions(
-          showNotification: true,
-          playSound: false,
-        ),
-        foregroundTaskOptions: ForegroundTaskOptions(
-          eventAction: ForegroundTaskEventAction.repeat(5000),
-          autoRunOnBoot: false,
-          allowWakeLock: true,
-          allowWifiLock: true,
-        ),
-      );
+      // 3. Check status
+      bool isServiceRunning = await service.isRunning();
 
-      // Connect to SignalR and subscribe in a single idempotent flow
-      await _ensureConnectedAndSubscribed();
-      if (!isConnected.value) {
-        throw Exception('Failed to connect to server');
+      if (!isServiceRunning) {
+        // 4. Start the service (This triggers onStart in background_service_initializer.dart)
+        await service.startService();
       }
 
-      // Start location updates
-      await _startLocationUpdates();
-
-      // Start foreground service
-      await FlutterForegroundTask.startService(
-        notificationTitle: 'PickuRides',
-        notificationText: "You're online and available for rides",
-      );
-
-      // Enable WakeLock to keep app running
-      await _enableWakeLock();
+      // 5. Sync the current ride ID to the background isolate
+      service.invoke('updateRideId', {'rideId': currentRideId.value});
 
       isRunning.value = true;
-      print('✅ SAHAr Background service started');
+      locationUpdateCount.value = 0; // Reset so Service Status Details shows current session count
+      print('✅ SAHAr Background Service started successfully');
       return true;
     } catch (e) {
-      print('❌ SAHAr Start service error: $e');
-      await stopBackgroundService();
+      print('❌ SAHAr Error starting service: $e');
       return false;
     }
   }
@@ -2348,7 +2394,8 @@ class BackgroundTrackingService extends GetxService {
       isSubscribed.value = false;
       connectionStatus.value = 'Disconnected';
 
-      await FlutterForegroundTask.stopService();
+      // Tell the background isolate to stop itself cleanly
+      FlutterBackgroundService().invoke('stopService');
       
       // Disable WakeLock
       await _disableWakeLock();
@@ -2363,18 +2410,19 @@ class BackgroundTrackingService extends GetxService {
       isRunning.value = false;
       isConnected.value = false;
       isSubscribed.value = false;
+      isLocationSending.value = false;
       connectionStatus.value = 'Disconnected';
       _hubConnection = null;
     }
   }
 
-  /// Update foreground notification
+  /// Update foreground notification (sends update command to background isolate)
   Future<void> updateNotification({String? title, String? text}) async {
     if (isRunning.value) {
-      await FlutterForegroundTask.updateService(
-        notificationTitle: title ?? 'PickuRides',
-        notificationText: text ?? "You're online and available for rides",
-      );
+      FlutterBackgroundService().invoke('updateNotification', {
+        'title': 'Pick U Driver',
+        'content': text ?? "You're online and available for rides",
+      });
     }
   }
 
@@ -2414,6 +2462,10 @@ class BackgroundTrackingService extends GetxService {
   void onClose() {
     _markerUpdateDebounce?.cancel();
     _connectivitySubscription?.cancel();
+    for (final sub in _bgServiceSubscriptions) {
+      sub.cancel();
+    }
+    _bgServiceSubscriptions.clear();
     stopBackgroundService();
     _stopReconnectionTimer();
     super.onClose();

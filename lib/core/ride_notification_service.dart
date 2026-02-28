@@ -25,9 +25,9 @@ class RideNotificationService extends GetxService {
 
   /// Initialize notification settings
   Future<void> _initializeNotifications() async {
-    // Use app icon for notifications (ic_notification should be in drawable folder)
+    // Use notification icon (ic_notification is a white vector drawable)
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_notification');
+        AndroidInitializationSettings('@drawable/ic_notification');
 
     const DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings(
@@ -184,7 +184,7 @@ class RideNotificationService extends GetxService {
         // Enable heads-up notification for high priority
         fullScreenIntent: isHighPriority,
         visibility: NotificationVisibility.public,
-        // Use small icon from drawable (should be white/transparent for Android)
+        // Use notification icon (white vector drawable)
         icon: '@drawable/ic_notification',
       );
 

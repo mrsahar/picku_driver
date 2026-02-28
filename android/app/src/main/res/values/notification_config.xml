@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notification icon for flutter_background_service -->
+    <drawable name="ic_bg_service_small">@drawable/ic_notification</drawable>
+</resources>
+

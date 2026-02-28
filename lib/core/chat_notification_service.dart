@@ -24,7 +24,7 @@ class ChatNotificationService extends GetxService {
   /// Initialize notification settings
   Future<void> _initializeNotifications() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_notification');
+        AndroidInitializationSettings('@drawable/ic_notification');
 
     const DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings(
@@ -156,7 +156,7 @@ class ChatNotificationService extends GetxService {
         playSound: false, // Disabled to prevent overlap - sound played via NotificationSoundService
         styleInformation: BigTextStyleInformation(''),
         category: AndroidNotificationCategory.message,
-        icon: '@drawable/ic_notification', // Use small icon for notification
+        icon: '@drawable/ic_notification', // Use notification icon (white vector drawable)
       );
 
       const DarwinNotificationDetails iOSPlatformChannelSpecifics =

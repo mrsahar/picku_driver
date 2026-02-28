@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pick_u_driver/core/global_variables.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
+import 'package:pick_u_driver/core/unified_signalr_service.dart';
 import 'package:pick_u_driver/providers/api_provider.dart';
 import '../models/login_model.dart';
 import '../routes/app_routes.dart';
@@ -187,6 +188,16 @@ class LoginController extends GetxController {
             duration: const Duration(seconds: 2),
           );
 
+          // Start background service (SignalR + Location) now that token is saved
+          try {
+            if (Get.isRegistered<UnifiedSignalRService>()) {
+              await UnifiedSignalRService.to.startBackgroundServiceIfNeeded();
+              print(' SAHAr ✅ Background SignalR service started after login');
+            }
+          } catch (e) {
+            print(' SAHAr ⚠️ Error starting background service after login: $e');
+          }
+
           // Navigate to MainMap for approved users
           Get.offAllNamed(AppRoutes.MainMap);
         }
@@ -253,6 +264,15 @@ class LoginController extends GetxController {
               if (approvalStatus == "Rejected" || approvalStatus == "Pending") {
                 Get.offAllNamed(AppRoutes.VERIFY_MESSAGE);
               } else {
+                // Start background service (SignalR + Location) for auto-login
+                try {
+                  if (Get.isRegistered<UnifiedSignalRService>()) {
+                    await UnifiedSignalRService.to.startBackgroundServiceIfNeeded();
+                    print(' SAHAr ✅ Background SignalR service started after auto-login');
+                  }
+                } catch (e) {
+                  print(' SAHAr ⚠️ Error starting background service after auto-login: $e');
+                }
                 Get.offAllNamed(AppRoutes.MainMap);
               }
               return;

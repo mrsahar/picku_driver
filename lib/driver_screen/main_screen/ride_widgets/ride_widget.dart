@@ -580,7 +580,13 @@ class _RideWidgetState extends State<RideWidget> {
     );
   }
 
+  static const double _routeCardMaxHeight = 100;
+
   Widget _buildRouteCard(RideAssignment ride) {
+    final stops = List<RideStop>.from(ride.stops)
+      ..sort((a, b) => a.stopOrder.compareTo(b.stopOrder));
+    final hasStops = stops.isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.all(16),
 
@@ -596,46 +602,94 @@ class _RideWidgetState extends State<RideWidget> {
         ),
       ),
 
-      child: Column(
-        children: [
-          _buildLocationRow(
-            icon: Icons.radio_button_checked_rounded,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: _routeCardMaxHeight),
 
-            title: "PICKUP",
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
 
-            value: ride.pickupLocation,
-          ),
+            children: [
+          if (hasStops) ...[
+            for (int i = 0; i < stops.length; i++) ...[
+              _buildLocationRow(
+                icon: i == 0
+                    ? Icons.radio_button_checked_rounded
+                    : (i == stops.length - 1
+                        ? Icons.location_on_rounded
+                        : Icons.stop_circle_rounded),
+                title: i == 0
+                    ? "PICKUP"
+                    : (i == stops.length - 1
+                        ? "DROP-OFF"
+                        : "STOP ${i}"),
+                value: stops[i].location,
+              ),
+              if (i < stops.length - 1)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8, top: 4, bottom: 4),
 
-          Padding(
-            padding: const EdgeInsets.only(left: 8, top: 4, bottom: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 2,
 
-            child: Row(
-              children: [
-                Container(
-                  width: 2,
+                        height: 20,
 
-                  height: 20,
+                        margin: const EdgeInsets.only(left: 7),
 
-                  margin: const EdgeInsets.only(left: 7),
+                        decoration: BoxDecoration(
+                          color: MColor.primaryNavy.withValues(alpha: 0.2),
 
-                  decoration: BoxDecoration(
-                    color: MColor.primaryNavy.withValues(alpha: 0.2),
-
-                    borderRadius: BorderRadius.circular(1),
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+            ],
+          ] else ...[
+            _buildLocationRow(
+              icon: Icons.radio_button_checked_rounded,
+
+              title: "PICKUP",
+
+              value: ride.pickupLocation,
             ),
+
+            Padding(
+              padding: const EdgeInsets.only(left: 8, top: 4, bottom: 4),
+
+              child: Row(
+                children: [
+                  Container(
+                    width: 2,
+
+                    height: 20,
+
+                    margin: const EdgeInsets.only(left: 7),
+
+                    decoration: BoxDecoration(
+                      color: MColor.primaryNavy.withValues(alpha: 0.2),
+
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            _buildLocationRow(
+              icon: Icons.location_on_rounded,
+
+              title: "DROP-OFF",
+
+              value: ride.dropoffLocation,
+            ),
+          ],
+            ],
           ),
-
-          _buildLocationRow(
-            icon: Icons.location_on_rounded,
-
-            title: "DROP-OFF",
-
-            value: ride.dropoffLocation,
-          ),
-        ],
+        ),
       ),
     );
   }

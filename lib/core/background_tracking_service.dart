@@ -1356,6 +1356,13 @@ class BackgroundTrackingService extends GetxService {
     }
   }
 
+  /// Public entry point for UnifiedSignalRService to trigger a full ride assignment
+  /// update (including route drawing) when NewRideAssigned arrives via the
+  /// background isolate path.
+  void onNewRideAssigned(Map<String, dynamic> rideData) {
+    _handleNewRideAssignment(rideData);
+  }
+
   /// Handle new ride assignment
   void _handleNewRideAssignment(Map<String, dynamic> rideData) {
     try {
@@ -1432,7 +1439,10 @@ class BackgroundTrackingService extends GetxService {
       _subscribeToRideChat(ride.rideId);
 
       //_showRideNotification(ride);
-      _updateUIForRideStatus(ride);
+      // Run route draw on next frame so LocationService/MapService are ready and Obx rebuilds
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _updateUIForRideStatus(ride);
+      });
 
       print('🚕 SAHAr Ride ${ride.rideId} - ${ride.status}');
     } catch (e) {

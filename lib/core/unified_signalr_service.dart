@@ -168,9 +168,9 @@ class UnifiedSignalRService extends GetxService {
             rideStatus.value = ride.status;
             if (Get.isRegistered<BackgroundTrackingService>()) {
               final bg = BackgroundTrackingService.to;
-              bg.currentRide.value = ride;
-              bg.currentRideId.value = ride.rideId;
-              bg.rideStatus.value = ride.status;
+              // Delegate to BackgroundTrackingService so it runs the full
+              // assignment flow: sets currentRide + draws route on map.
+              bg.onNewRideAssigned(data);
             }
           }
         } catch (e) {

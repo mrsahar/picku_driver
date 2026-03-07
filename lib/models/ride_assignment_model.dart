@@ -61,7 +61,7 @@ class RideAssignment {
       dropoffLat: (json['dropoffLat'] ?? 0).toDouble(),
       dropoffLon: (json['dropoffLon'] ?? 0).toDouble(),
       stops: (json['stops'] as List?)
-          ?.map((stop) => RideStop.fromJson(stop))
+          ?.map((stop) => RideStop.fromJson(Map<String, dynamic>.from(stop is Map ? stop : <String, dynamic>{})))
           .toList() ?? [],
       passengerCount: json['passengerCount'] ?? 1,
       payment: json['payment'],

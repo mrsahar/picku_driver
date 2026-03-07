@@ -360,7 +360,7 @@ class MapService extends GetxService with WidgetsBindingObserver {
     // ✅ CRITICAL FIX: Use assignAll with single polyline to replace ALL old polylines
     // This ensures only ONE polyline exists at a time
     polylines.assignAll({polyline});
-    
+    polylines.refresh(); // Force Obx in HomeScreen to rebuild so polyline appears
     print('✅ MapService: Route polyline updated - ${points.length} points, color: $routeColor');
     print('🧪 MapService: Total Polylines: ${polylines.length} (should be 1)');
     if (polylines.length > 1) {

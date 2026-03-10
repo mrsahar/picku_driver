@@ -95,7 +95,7 @@ class _WhyNeedPermissionScreenState extends State<WhyNeedPermissionScreen> {
                     child: Text(
                       _errorMessage.isNotEmpty
                           ? _errorMessage
-                          : 'We need access to your location to provide accurate driver tracking and navigation services.',
+                          : 'PickU Driver collects location data to enable real-time ride assignments and route tracking even when the app is closed or not in use. This data is essential to ensure you receive ride requests while you are using navigation apps or your screen is locked.',
                       style: TextStyle(
                         fontSize: 16,
                         color: isDark ? Colors.grey[300] : Colors.grey[600],
@@ -136,7 +136,7 @@ class _WhyNeedPermissionScreenState extends State<WhyNeedPermissionScreen> {
                               ),
                             )
                           : const Text(
-                              'Grant Location Access',
+                              'Agree & Turn On',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w600,
@@ -207,12 +207,12 @@ class _WhyNeedPermissionScreenState extends State<WhyNeedPermissionScreen> {
                         const SizedBox(height: 12),
                         _buildFeatureItem(
                           Icons.navigation_rounded,
-                          'Real-time navigation',
+                          'Real-time navigation even if your screen is off',
                           isDark,
                         ),
                         _buildFeatureItem(
                           Icons.my_location_rounded,
-                          'Driver location tracking',
+                          'Driver background location tracking',
                           isDark,
                         ),
                         _buildFeatureItem(

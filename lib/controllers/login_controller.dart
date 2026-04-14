@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pick_u_driver/core/global_variables.dart';
+import 'package:pick_u_driver/core/push_service.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/core/unified_signalr_service.dart';
 import 'package:pick_u_driver/providers/api_provider.dart';
@@ -88,7 +89,7 @@ class LoginController extends GetxController {
       final loginRequest = LoginRequest(
         email: emailController.text.trim(),
         password: passwordController.text,
-        deviceToken:'',
+        deviceToken: PushService.to.currentToken,
       );
 
       print(' SAHAr 📤 Login: Sending request for email: ${emailController.text}');
@@ -120,7 +121,9 @@ class LoginController extends GetxController {
         }
 
         final message = dataMap['message'] ?? response.message;
-        final approvalStatus = dataMap['approvalStatus'];
+        final dynamic approvalStatusRaw = dataMap['approvalStatus'];
+        final String? approvalStatus = approvalStatusRaw?.toString();
+        final String? approvalStatusNormalized = approvalStatus?.trim().toLowerCase();
 
         print(' SAHAr 📊 Login: ApprovalStatus received: $approvalStatus');
         print(' SAHAr 📝 Login: Message received: $message');
@@ -143,19 +146,43 @@ class LoginController extends GetxController {
         clearForm();
 
         // Check approval status and handle accordingly
-        if (approvalStatus == "Rejected" || approvalStatus == "Pending") {
-          // DO NOT save user data for rejected/pending users
-          // Only set temporary global variables for UI purposes
+        //
+        // Required behavior:
+        // - approvalStatus == null/empty  -> send user to upload documents page
+        // - approvalStatus == pending    -> show pending state
+        // - approvalStatus == reject     -> tell user to upload documents again
+        //
+        // Backend can return different casings/spellings, so normalize.
+        final bool isApprovalMissing =
+            approvalStatusNormalized == null || approvalStatusNormalized.isEmpty || approvalStatusNormalized == 'null';
+        final bool isPending =
+            approvalStatusNormalized == 'pending' || approvalStatusNormalized == 'pennding';
+        final bool isRejected =
+            approvalStatusNormalized == 'rejected' || approvalStatusNormalized == 'reject';
+
+        if (isApprovalMissing || isPending || isRejected) {
+          // DO NOT save user data for missing/pending/rejected users
+          // Only set global variables needed for document upload and UI routing
           final globalVars = GlobalVariables.instance;
           final dataMap = response.data as Map<String, dynamic>;
           globalVars.setUserEmail(dataMap['email'] ?? emailController.text.trim());
-          globalVars.setUserId(dataMap['userId'] ?? ''); // Add userId for rejected/pending users
+          globalVars.setUserId(dataMap['userId'] ?? '');
+          globalVars.setUserToken((dataMap['token'] ?? '').toString());
+          globalVars.setLoginStatus(true);
+
+          if (isApprovalMissing) {
+            // approvalStatus = null -> go directly to upload documents page
+            Get.offAllNamed(AppRoutes.DRIVER_DOCUMENTS);
+            return;
+          }
+
+          final String statusForUi = isRejected ? 'Rejected' : 'Pending';
 
           // Show status-specific message
           Get.snackbar(
-            approvalStatus == "Rejected" ? 'Account Rejected' : 'Account Pending',
+            isRejected ? 'Account Rejected' : 'Account Pending',
             message,
-            backgroundColor: approvalStatus == "Rejected" ? Colors.red : Colors.orange,
+            backgroundColor: isRejected ? Colors.red : Colors.orange,
             colorText: Colors.white,
             snackPosition: SnackPosition.TOP,
             duration: const Duration(seconds: 3),
@@ -163,10 +190,9 @@ class LoginController extends GetxController {
 
           // Navigate to verification screen with arguments
           Get.offAllNamed(AppRoutes.VERIFY_MESSAGE, arguments: {
-            'status': approvalStatus,
+            'status': statusForUi,
             'message': message,
           });
-
         } else {
           // ONLY save user data for approved users
           final dataMap = response.data as Map<String, dynamic>;
@@ -242,6 +268,7 @@ class LoginController extends GetxController {
       final expiresStr = userData['expires'];
       final isLoggedIn = userData['isLoggedIn'];
       final approvalStatus = userData['approvalStatus'];
+      final approvalStatusNormalized = approvalStatus?.trim().toLowerCase();
 
       if (token != null && token.isNotEmpty && isLoggedIn == 'true') {
         print(' SAHAr ✅ User has login data, checking token expiry...');
@@ -259,10 +286,25 @@ class LoginController extends GetxController {
               globalVars.setUserToken(token);
               globalVars.setUserEmail(userData['email'] ?? '');
               globalVars.setLoginStatus(true);
+              globalVars.setUserId(userData['userId'] ?? '');
 
               // Navigate based on approval status
-              if (approvalStatus == "Rejected" || approvalStatus == "Pending") {
-                Get.offAllNamed(AppRoutes.VERIFY_MESSAGE);
+              final bool isApprovalMissing =
+                  approvalStatusNormalized == null || approvalStatusNormalized.isEmpty || approvalStatusNormalized == 'null';
+              final bool isPending =
+                  approvalStatusNormalized == 'pending' || approvalStatusNormalized == 'pennding';
+              final bool isRejected =
+                  approvalStatusNormalized == 'rejected' || approvalStatusNormalized == 'reject';
+
+              if (isApprovalMissing) {
+                Get.offAllNamed(AppRoutes.DRIVER_DOCUMENTS);
+              } else if (isPending || isRejected) {
+                Get.offAllNamed(AppRoutes.VERIFY_MESSAGE, arguments: {
+                  'status': isRejected ? 'Rejected' : 'Pending',
+                  'message': isRejected
+                      ? 'We need you to resubmit your documents.'
+                      : 'Your documents are under review.',
+                });
               } else {
                 // Start background service (SignalR + Location) for auto-login
                 try {
@@ -355,6 +397,7 @@ class LoginController extends GetxController {
 class LoginBinding extends Bindings {
   @override
   void dependencies() {
-    Get.lazyPut<LoginController>(() => LoginController());
+    // Keep alive to avoid TextEditingController disposed during transitions.
+    Get.put<LoginController>(LoginController(), permanent: true);
   }
 }

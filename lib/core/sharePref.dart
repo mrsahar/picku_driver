@@ -11,6 +11,11 @@ class SharedPrefsService {
   static const String _keyStripeAccountId = 'driver_stripe_account_id';
   static const String _keyRideStatus = 'ride_status';
   static const String _keyApprovalStatus = 'approval_status';
+  static const String _keyFcmToken = 'fcm_token';
+  static const String _keyDidMigrateNotificationChannelsV4 =
+      'did_migrate_notification_channels_v4';
+  static const String _keyUseSystemSoundForChat =
+      'use_system_sound_for_chat_v1';
 
   // Save user login data
   static Future<void> saveUserData({
@@ -290,6 +295,63 @@ class SharedPrefsService {
     }
   }
 
+  static Future<void> saveFcmToken(String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyFcmToken, token);
+    } catch (e) {
+      print(' SAHAr 💥 Error saving FCM token: $e');
+    }
+  }
+
+  static Future<String?> getFcmToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_keyFcmToken);
+    } catch (e) {
+      print(' SAHAr 💥 Error getting FCM token: $e');
+      return null;
+    }
+  }
+
+  static Future<bool> getDidMigrateNotificationChannelsV4() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_keyDidMigrateNotificationChannelsV4) ?? false;
+    } catch (e) {
+      print(' SAHAr 💥 Error reading channel migration flag: $e');
+      return false;
+    }
+  }
+
+  static Future<void> setDidMigrateNotificationChannelsV4(bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyDidMigrateNotificationChannelsV4, value);
+    } catch (e) {
+      print(' SAHAr 💥 Error writing channel migration flag: $e');
+    }
+  }
+
+  static Future<bool> getUseSystemSoundForChat() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_keyUseSystemSoundForChat) ?? true;
+    } catch (e) {
+      print(' SAHAr 💥 Error reading chat sound toggle: $e');
+      return true;
+    }
+  }
+
+  static Future<void> setUseSystemSoundForChat(bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyUseSystemSoundForChat, value);
+    } catch (e) {
+      print(' SAHAr 💥 Error writing chat sound toggle: $e');
+    }
+  }
+
   // Clear all user data (for logout)
   static Future<void> clearUserData() async {
     try {
@@ -303,6 +365,7 @@ class SharedPrefsService {
       await prefs.remove(_keyStripeAccountId);
       await prefs.remove(_keyApprovalStatus);
       await prefs.remove(_keyRideStatus);
+      await prefs.remove(_keyFcmToken);
       await prefs.setBool(_keyIsLoggedIn, false);
 
       print(' SAHAr 💾 User data cleared from SharedPreferences');

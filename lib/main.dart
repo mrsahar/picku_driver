@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:pick_u_driver/core/background_service_initializer.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:pick_u_driver/core/push_service.dart';
 import 'package:pick_u_driver/routes/app_pages.dart';
 import 'package:pick_u_driver/utils/theme/app_theme.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -24,6 +27,9 @@ Future<void> main() async {
   // Initialize background service (configures but does NOT auto-start)
   // Service is started explicitly after login when token is saved
   await initializeBackgroundService();
+
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   runApp(const MyApp());
 }

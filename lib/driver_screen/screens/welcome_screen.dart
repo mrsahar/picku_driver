@@ -26,11 +26,23 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   /// Check if user is already logged in and redirect to main map
   Future<void> _checkAuthenticationStatus() async {
-    final isAuthenticated = await AuthService.isAuthenticated();
+    try {
+      final isAuthenticated = await AuthService.isAuthenticated();
 
-    if (isAuthenticated && mounted) {
-      // Check permissions before redirecting to main map
-      await _checkPermissions();
+      if (!mounted) return;
+
+      if (isAuthenticated) {
+        // Check permissions before redirecting to main map
+        await _checkPermissions();
+      } else {
+        // Token missing/expired -> go to login
+        Get.offAllNamed(AppRoutes.LOGIN_SCREEN);
+      }
+    } catch (e) {
+      print('Error checking authentication: $e');
+      if (mounted) {
+        Get.offAllNamed(AppRoutes.LOGIN_SCREEN);
+      }
     }
   }
 

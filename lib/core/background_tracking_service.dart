@@ -11,13 +11,12 @@ import 'package:pick_u_driver/core/location_service.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/core/global_variables.dart';
 import 'package:pick_u_driver/core/ride_notification_service.dart';
-import 'package:pick_u_driver/core/chat_notification_service.dart';
 import 'package:pick_u_driver/core/notification_sound_service.dart';
 import 'package:pick_u_driver/core/internet_connectivity_service.dart';
 import 'package:pick_u_driver/driver_screen/widget/modern_payment_dialog.dart';
 import 'package:pick_u_driver/models/ride_assignment_model.dart'; 
 import 'package:pick_u_driver/routes/app_routes.dart';
-import 'package:signalr_core/signalr_core.dart';
+import 'package:signalr_netcore/signalr_client.dart';
 // flutter_foreground_task removed — service is managed by flutter_background_service
 import 'package:permission_handler/permission_handler.dart';
 import 'package:pick_u_driver/utils/theme/mcolors.dart';
@@ -44,17 +43,6 @@ class BackgroundTrackingService extends GetxService {
     try {
       return Get.isRegistered<RideNotificationService>()
           ? RideNotificationService.to
-          : null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  // Get chat notification service
-  ChatNotificationService? get _chatNotificationService {
-    try {
-      return Get.isRegistered<ChatNotificationService>()
-          ? ChatNotificationService.to
           : null;
     } catch (e) {
       return null;
@@ -381,11 +369,11 @@ class BackgroundTrackingService extends GetxService {
       _hubConnection = HubConnectionBuilder()
           .withUrl(
             _hubUrl,
-            HttpConnectionOptions(
+            options: HttpConnectionOptions(
               accessTokenFactory: () async => jwtToken,
             ),
           )
-          .withAutomaticReconnect([2000, 5000, 10000, 15000, 30000])
+          .withAutomaticReconnect(retryDelays: [2000, 5000, 10000, 15000, 30000])
           .build();
 
       _setupConnectionHandlers();
@@ -818,7 +806,7 @@ class BackgroundTrackingService extends GetxService {
     print('🔧 SAHAr [BG] Setting up SignalR connection handlers...');
 
     // Connection state handlers
-    _hubConnection!.onclose((error) {
+    _hubConnection!.onclose(({error}) {
       print('❌ SAHAr Hub disconnected: $error');
       isConnected.value = false;
       isSubscribed.value = false;
@@ -827,12 +815,12 @@ class BackgroundTrackingService extends GetxService {
       _startReconnectionTimer();
     });
 
-    _hubConnection!.onreconnecting((error) {
+    _hubConnection!.onreconnecting(({error}) {
       print('🔄 SAHAr Hub reconnecting: $error');
       connectionStatus.value = 'Reconnecting...';
     });
 
-    _hubConnection!.onreconnected((connectionId) {
+    _hubConnection!.onreconnected(({connectionId}) {
       print('✅ SAHAr Hub reconnected: $connectionId');
       print('🟢 SAHAr Driver is Back Online'); // ✅ Log as 'Back Online'
       isConnected.value = true;
@@ -850,6 +838,10 @@ class BackgroundTrackingService extends GetxService {
       if (_driverId != null) {
         _ensureConnectedAndSubscribed();
       }
+
+      // Chat re-join is handled by the background isolate SignalR stack
+      // (background_service_initializer.dart + UnifiedSignalRService). Keeping
+      // chat join here duplicates messages/notifications.
     });
 
     // ===== RIDE ASSIGNMENT EVENTS =====
@@ -1069,61 +1061,10 @@ class BackgroundTrackingService extends GetxService {
     });
 
     // ===== CHAT MESSAGE EVENTS =====
-    _hubConnection!.on('ReceiveRideChatMessage', (List<Object?>? arguments) {
-      print('💬💬💬 SAHAr [BG][SignalR] >>>>>> ReceiveRideChatMessage TRIGGERED <<<<<<');
-      print('💬 SAHAr [BG][SignalR] ReceiveRideChatMessage RAW arguments: $arguments');
-      if (arguments != null && arguments.isNotEmpty) {
-        try {
-          final messageData = arguments[0] as Map<String, dynamic>;
-          print('💬 SAHAr [BG][SignalR] Message data: $messageData');
-
-          // Extract message details
-          final String senderId = messageData['senderId']?.toString() ?? '';
-          final String senderRole = messageData['senderRole']?.toString() ?? '';
-          final String message = messageData['message']?.toString() ?? '';
-          final String rideId = messageData['rideId']?.toString() ?? currentRideId.value;
-
-          print('💬 SAHAr [BG] New chat message received:');
-          print('   - Sender ID: $senderId');
-          print('   - Sender Role: $senderRole');
-          print('   - Message: $message');
-          print('   - Ride ID: $rideId');
-          print('   - Current Driver ID: $_driverId');
-
-          // Only show notification if message is from passenger (Rider)
-          // Check: senderRole is Rider AND senderId is NOT the current driver
-          final isFromPassenger = senderRole.toLowerCase() == 'rider';
-          final isNotFromMe = senderId != _driverId;
-
-          print('💬 SAHAr [BG] Message filtering:');
-          print('   - Is from passenger (Rider): $isFromPassenger');
-          print('   - Is not from me: $isNotFromMe');
-          print('   - Chat notification service available: ${_chatNotificationService != null}');
-
-          if (isFromPassenger && isNotFromMe) {
-            // Show notification using ChatNotificationService
-            if (_chatNotificationService != null) {
-              print('💬 SAHAr [BG] Showing chat notification...');
-              _chatNotificationService!.showChatMessageNotification(
-                senderName: 'Passenger',
-                message: message,
-                rideId: rideId,
-              );
-              print('✅ SAHAr [BG] Chat notification shown for passenger message');
-            } else {
-              print('❌ SAHAr [BG] ChatNotificationService not available - cannot show notification');
-            }
-          } else {
-            print('⏭️ SAHAr [BG] Skipping notification (not from passenger or from self)');
-          }
-        } catch (e) {
-          print('❌ SAHAr [BG] Error handling chat message: $e');
-          print('❌ SAHAr Stack trace: ${StackTrace.current}');
-        }
-      } else {
-        print('⚠️ SAHAr [BG][SignalR] ReceiveRideChatMessage: no arguments');
-      }
-    });
+    // Disabled: driver app has a second SignalR stack in the background isolate
+    // (background_service_initializer.dart + UnifiedSignalRService) which already
+    // receives chat messages + replay and shows notifications. Keeping chat here
+    // duplicates receives/notifications.
 
     print('✅✅✅ SAHAr [BG] ALL SIGNALR HANDLERS REGISTERED SUCCESSFULLY ✅✅✅');
     print('✅ SAHAr [BG] Listening for SignalR events:');
@@ -1133,7 +1074,7 @@ class BackgroundTrackingService extends GetxService {
     print('   - RideCompleted');
     print('   - PaymentCompleted');
     print('   - DriverStatusChanged');
-    print('   - ReceiveRideChatMessage');
+    // print('   - ReceiveRideChatMessage'); // disabled (handled by background isolate)
   }
 
 
@@ -1189,7 +1130,7 @@ class BackgroundTrackingService extends GetxService {
         final state = _hubConnection!.state;
         print('🔄 SAHAr Current hub state: $state');
 
-        if (state != HubConnectionState.disconnected) {
+        if (state != HubConnectionState.Disconnected) {
           print('🔄 SAHAr Disposing existing connection...');
           await _hubConnection!.stop();
           _hubConnection = null;
@@ -1294,7 +1235,8 @@ class BackgroundTrackingService extends GetxService {
     _isSubscribing = true;
     try {
       print('🔔 SAHAr Invoking SubscribeDriver for driverId=$_driverId');
-      await _hubConnection!.invoke('SubscribeDriver', args: [_driverId]);
+      final driverId = _driverId!;
+      await _hubConnection!.invoke('SubscribeDriver', args: <Object>[driverId]);
       isSubscribed.value = true;
       print('✅ SAHAr Subscribed to rides for: $_driverId');
     } catch (e) {
@@ -1309,7 +1251,8 @@ class BackgroundTrackingService extends GetxService {
     if (_hubConnection == null || _driverId == null) return;
 
     try {
-      await _hubConnection!.invoke('UnsubscribeDriver', args: [_driverId]);
+      final driverId = _driverId!;
+      await _hubConnection!.invoke('UnsubscribeDriver', args: <Object>[driverId]);
       isSubscribed.value = false;
       print('✅ SAHAr Unsubscribed from rides');
       _resetRide();
@@ -1338,7 +1281,9 @@ class BackgroundTrackingService extends GetxService {
     }
 
     // STEP 1: Ensure connection
-    if (!isConnected.value || _hubConnection == null || _hubConnection!.state == HubConnectionState.disconnected) {
+    if (!isConnected.value ||
+        _hubConnection == null ||
+        _hubConnection!.state == HubConnectionState.Disconnected) {
       final connected = await _connect();
       if (!connected) {
         print('❌ SAHAr _ensureConnectedAndSubscribed: connect() failed');
@@ -1435,8 +1380,8 @@ class BackgroundTrackingService extends GetxService {
       rideStatus.value = ride.status;
       currentRideId.value = ride.rideId;
 
-      // ✅ Auto-subscribe to ride chat for notifications
-      _subscribeToRideChat(ride.rideId);
+      // ✅ Chat subscription/notifications are handled by the background isolate
+      // SignalR stack (background_service_initializer.dart + UnifiedSignalRService).
 
       //_showRideNotification(ride);
       // Run route draw on next frame so LocationService/MapService are ready and Obx rebuilds
@@ -1928,51 +1873,6 @@ class BackgroundTrackingService extends GetxService {
     });
   }
 
-  /// Subscribe to ride chat to receive chat notifications
-  Future<void> _subscribeToRideChat(String rideId) async {
-    if (_hubConnection == null || rideId.isEmpty) {
-      print('⚠️ SAHAr Cannot subscribe to chat: hubConnection is null or rideId is empty');
-      return;
-    }
-
-    try {
-      print('💬 SAHAr [BG] Subscribing to ride chat: $rideId');
-
-      // ✅ Ensure chat notification service is available and has permission
-      if (_chatNotificationService != null) {
-        // Check if permission is already granted
-        final hasPermission = await _chatNotificationService!.checkNotificationPermission();
-
-        if (!hasPermission) {
-          print('⚠️ SAHAr [BG] Chat notification permission not granted, requesting...');
-          // Request permission
-          final granted = await _chatNotificationService!.requestNotificationPermission();
-          if (granted) {
-            print('✅ SAHAr [BG] Chat notification permission granted');
-          } else {
-            print('❌ SAHAr [BG] Chat notification permission denied - notifications will not work');
-          }
-        } else {
-          print('✅ SAHAr [BG] Chat notification permission already granted');
-        }
-      } else {
-        print('⚠️ SAHAr [BG] ChatNotificationService not available');
-      }
-
-      // Join the ride chat room via SignalR
-      await _hubConnection!.invoke('JoinRideChat', args: [rideId]);
-
-      print('✅ SAHAr [BG] Subscribed to ride chat for: $rideId');
-
-      // Request chat history to show any existing messages
-      await _hubConnection!.invoke('GetRideChatHistory', args: [rideId]);
-
-      print('💬 SAHAr [BG] Chat history requested for: $rideId');
-    } catch (e) {
-      print('❌ SAHAr [BG] Error subscribing to chat: $e');
-    }
-  }
-
   /// Public method to trigger the completed flow from outside
   void triggerCompletedFlow(RideAssignment ride) {
     print('🏁 SAHAr [BG] triggerCompletedFlow called for ride: ${ride.rideId}');
@@ -2062,9 +1962,10 @@ class BackgroundTrackingService extends GetxService {
     if (isConnected.value && _hubConnection != null) {
       try {
         print('📡 SAHAr Invoking UpdateLocation on SignalR...');
+        final driverId = _driverId!;
         await _hubConnection!.invoke(
           'UpdateLocation',
-          args: [rideId, _driverId, latitude, longitude],
+          args: <Object>[rideId, driverId, latitude, longitude],
         );
 
         locationUpdateCount.value++;
@@ -2134,7 +2035,7 @@ class BackgroundTrackingService extends GetxService {
 
           await _hubConnection!.invoke(
             'UpdateLocation',
-            args: [rideId, _driverId, lat, lng],
+            args: <Object>[rideId, _driverId!, lat, lng],
           );
 
           syncedIds.add(id);

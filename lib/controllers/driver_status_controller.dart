@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:pick_u_driver/core/background_tracking_service.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
+import 'package:pick_u_driver/driver_screen/setup_payment_account_screen.dart';
 import 'package:pick_u_driver/providers/api_provider.dart';
 import 'package:pick_u_driver/utils/theme/mcolors.dart';
 
@@ -281,7 +282,12 @@ class DriverStatusController extends GetxController {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () => Get.back(),
+                onPressed: () {
+                  Get.back();
+                  Future.microtask(
+                    () => Get.to(() => const SetupPaymentAccountScreen()),
+                  );
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: MColor.primaryNavy,
                   padding: const EdgeInsets.symmetric(vertical: 12),

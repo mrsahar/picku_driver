@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/routes/app_routes.dart';
 
 class RideNotificationService extends GetxService {
@@ -10,6 +13,11 @@ class RideNotificationService extends GetxService {
 
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+
+  static const String rideChannelId = 'ride_updates_pick_u_driver_v4';
+  static const String rideChannelName = 'Ride Updates';
+  static const String rideChannelDescription =
+      'Notifications for ride status updates';
 
   var isNotificationPermissionGranted = false.obs;
   var hasRequestedPermission = false.obs;
@@ -49,11 +57,45 @@ class RideNotificationService extends GetxService {
 
     print('🔔 SAHAr Ride Notification service initialized');
 
+    if (Platform.isAndroid) {
+      await _ensureAndroidChannels();
+    }
+
     // Check permission on initialization
     try {
       await checkNotificationPermission();
     } catch (e) {
       print('⚠️ SAHAr Error refreshing ride notification permission on init: $e');
+    }
+  }
+
+  Future<void> _ensureAndroidChannels() async {
+    final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+        _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin == null) return;
+
+    final didMigrate =
+        await SharedPrefsService.getDidMigrateNotificationChannelsV4();
+    if (!didMigrate) {
+      // One-time delete legacy channel ids so sound/importance updates apply.
+      await androidPlugin.deleteNotificationChannel('ride_updates');
+    }
+
+    const AndroidNotificationChannel rideChannel = AndroidNotificationChannel(
+      rideChannelId,
+      rideChannelName,
+      description: rideChannelDescription,
+      importance: Importance.max,
+      enableVibration: true,
+      playSound: true,
+      showBadge: true,
+    );
+
+    await androidPlugin.createNotificationChannel(rideChannel);
+
+    if (!didMigrate) {
+      await SharedPrefsService.setDidMigrateNotificationChannelsV4(true);
     }
   }
 
@@ -170,15 +212,14 @@ class RideNotificationService extends GetxService {
       // Configure notification with high priority for heads-up display
       final AndroidNotificationDetails androidPlatformChannelSpecifics =
           AndroidNotificationDetails(
-        'ride_updates', // channel id
-        'Ride Updates', // channel name
-        channelDescription: 'Notifications for ride status updates',
+        rideChannelId, // channel id
+        rideChannelName, // channel name
+        channelDescription: rideChannelDescription,
         importance: isHighPriority ? Importance.max : Importance.high,
         priority: isHighPriority ? Priority.max : Priority.high,
         showWhen: true,
         enableVibration: true,
         playSound: true,
-        sound: const RawResourceAndroidNotificationSound('notification'),
         styleInformation: const BigTextStyleInformation(''),
         category: AndroidNotificationCategory.status,
         // Enable heads-up notification for high priority

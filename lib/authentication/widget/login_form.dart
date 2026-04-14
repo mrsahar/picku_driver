@@ -13,12 +13,22 @@ class LoginForm extends StatefulWidget {
 }
 
 class _LoginFormState extends State<LoginForm> {
+  late final LoginController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    // Keep the controller alive during route transitions; otherwise a TextField
+    // can try to read its controller after GetX disposes it.
+    _controller = Get.isRegistered<LoginController>()
+        ? Get.find<LoginController>()
+        : Get.put(LoginController(), permanent: true);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<LoginController>();
-
     return Form(
-      key: controller.formKey,
+      key: _controller.formKey,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20 - 10),
         child: Column(
@@ -29,8 +39,8 @@ class _LoginFormState extends State<LoginForm> {
             ),
             // Email Input Field
             TextFormField(
-              controller: controller.emailController,
-              validator: controller.validateEmail,
+              controller: _controller.emailController,
+              validator: _controller.validateEmail,
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.email),
@@ -42,18 +52,18 @@ class _LoginFormState extends State<LoginForm> {
             const SizedBox(height: 15),
             // Password Input Field
             Obx(() => TextFormField(
-              controller: controller.passwordController,
-              validator: controller.validatePassword,
-              obscureText: !controller.isPasswordVisible.value,
+              controller: _controller.passwordController,
+              validator: _controller.validatePassword,
+              obscureText: !_controller.isPasswordVisible.value,
               decoration: InputDecoration(
                 prefixIcon: const Icon(Icons.lock),
                 labelText: "Enter Password",
                 hintText: "Password",
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
-                  onPressed: controller.togglePasswordVisibility,
+                  onPressed: _controller.togglePasswordVisibility,
                   icon: Icon(
-                    controller.isPasswordVisible.value
+                    _controller.isPasswordVisible.value
                         ? Icons.visibility
                         : Icons.visibility_off,
                   ),
@@ -73,12 +83,12 @@ class _LoginFormState extends State<LoginForm> {
             Obx(() => SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: controller.isLoading.value
+                onPressed: _controller.isLoading.value
                     ? null
                     : () {
-                  controller.login(context);
+                  _controller.login(context);
                 },
-                child: controller.isLoading.value
+                child: _controller.isLoading.value
                     ? const CircularProgressIndicator(color: Colors.white)
                     : Text("Login".toUpperCase()),
               ),

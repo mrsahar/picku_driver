@@ -42,6 +42,9 @@ class _MainMapState extends State<MainMap> {
     }
 
     _permissionService = PermissionService.to;
+    if (mounted) {
+      setState(() {});
+    }
 
     // Check if permissions are ready
     if (!_permissionService!.isReady) {
@@ -81,6 +84,9 @@ class _MainMapState extends State<MainMap> {
 
       // All good, initialize PermissionService and proceed
       _permissionService = Get.put(PermissionService(), permanent: true);
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
       print('Error checking permission status: $e');
       if (mounted) {

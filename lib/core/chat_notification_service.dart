@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:pick_u_driver/core/notification_sound_service.dart';
+import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/routes/app_routes.dart';
 
 class ChatNotificationService extends GetxService {
@@ -10,6 +11,11 @@ class ChatNotificationService extends GetxService {
 
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+
+  static const String chatChannelId = 'chat_messages_pick_u_driver_v4';
+  static const String chatChannelName = 'Chat Messages';
+  static const String chatChannelDescription =
+      'Notifications for new chat messages';
 
   var isNotificationPermissionGranted = false.obs;
   var hasRequestedPermission = false.obs;
@@ -46,11 +52,42 @@ class ChatNotificationService extends GetxService {
 
     print('🔔 SAHAr Chat Notification service initialized');
 
+    await _ensureAndroidChannels();
+
     // Refresh permission flag so notifications can work even before chat screen opens
     try {
       await checkNotificationPermission();
     } catch (e) {
       print('⚠️ SAHAr Error refreshing notification permission on init: $e');
+    }
+  }
+
+  Future<void> _ensureAndroidChannels() async {
+    final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+        _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin == null) return;
+
+    final didMigrate =
+        await SharedPrefsService.getDidMigrateNotificationChannelsV4();
+    if (!didMigrate) {
+      await androidPlugin.deleteNotificationChannel('chat_messages');
+    }
+
+    const AndroidNotificationChannel chatChannel = AndroidNotificationChannel(
+      chatChannelId,
+      chatChannelName,
+      description: chatChannelDescription,
+      importance: Importance.max,
+      enableVibration: true,
+      playSound: true,
+      showBadge: true,
+    );
+
+    await androidPlugin.createNotificationChannel(chatChannel);
+
+    if (!didMigrate) {
+      await SharedPrefsService.setDidMigrateNotificationChannelsV4(true);
     }
   }
 
@@ -133,30 +170,32 @@ class ChatNotificationService extends GetxService {
     }
 
     try {
-      // Play custom notification sound via NotificationSoundService
-      // This prevents sound overlap with system notification sound
-      try {
-        if (Get.isRegistered<NotificationSoundService>()) {
-          await NotificationSoundService.to.playNotificationSound();
+      final useSystemSound = await SharedPrefsService.getUseSystemSoundForChat();
+
+      if (!useSystemSound) {
+        // Legacy path: Play custom sound via NotificationSoundService.
+        try {
+          if (Get.isRegistered<NotificationSoundService>()) {
+            await NotificationSoundService.to.playNotificationSound();
+          }
+        } catch (e) {
+          print('⚠️ SAHAr Could not play notification sound: $e');
         }
-      } catch (e) {
-        print('⚠️ SAHAr Could not play notification sound: $e');
       }
 
-      // Configure notification WITHOUT system sound to prevent overlap
-      const AndroidNotificationDetails androidPlatformChannelSpecifics =
+      final AndroidNotificationDetails androidPlatformChannelSpecifics =
           AndroidNotificationDetails(
-        'chat_messages', // channel id
-        'Chat Messages', // channel name
-        channelDescription: 'Notifications for new chat messages',
-        importance: Importance.high,
+        chatChannelId,
+        chatChannelName,
+        channelDescription: chatChannelDescription,
+        importance: Importance.max,
         priority: Priority.high,
         showWhen: true,
         enableVibration: true,
-        playSound: false, // Disabled to prevent overlap - sound played via NotificationSoundService
-        styleInformation: BigTextStyleInformation(''),
+        playSound: useSystemSound,
+        styleInformation: const BigTextStyleInformation(''),
         category: AndroidNotificationCategory.message,
-        icon: '@drawable/ic_notification', // Use notification icon (white vector drawable)
+        icon: '@drawable/ic_notification',
       );
 
       const DarwinNotificationDetails iOSPlatformChannelSpecifics =
@@ -166,7 +205,7 @@ class ChatNotificationService extends GetxService {
         presentSound: true,
       );
 
-      const NotificationDetails platformChannelSpecifics = NotificationDetails(
+      final NotificationDetails platformChannelSpecifics = NotificationDetails(
         android: androidPlatformChannelSpecifics,
         iOS: iOSPlatformChannelSpecifics,
       );

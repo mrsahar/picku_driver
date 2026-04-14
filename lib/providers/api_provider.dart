@@ -493,6 +493,16 @@ class ApiProvider extends GetConnect {
     }
   }
 
+  Future<Response> updateFcmToken(String fcmToken) async {
+    try {
+      print(' SAHAr 🚀 ApiProvider: Updating FCM token');
+      return await postData('/api/Drivers/fcm-token', {'fcmToken': fcmToken});
+    } catch (e) {
+      print(' SAHAr 💥 ApiProvider: updateFcmToken exception: $e');
+      return Response(statusCode: 500, statusText: 'Network Error: $e');
+    }
+  }
+
   Future<ForgotPasswordResponse> forgotPassword(ForgotPasswordRequest request) async {
     try {
       print(' SAHAr 🚀 MRSAHAr ApiProvider: Starting forgot password for: ${_globalVars.baseUrl}/api/Drivers/forgot-password');

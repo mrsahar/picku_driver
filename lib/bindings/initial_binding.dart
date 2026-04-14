@@ -6,6 +6,7 @@ import 'package:pick_u_driver/core/database_helper.dart';
 import 'package:pick_u_driver/core/driver_service.dart';
 import 'package:pick_u_driver/core/global_variables.dart';
 import 'package:pick_u_driver/core/internet_connectivity_service.dart';
+import 'package:pick_u_driver/core/push_service.dart';
 import 'package:pick_u_driver/providers/api_provider.dart';
 
 import '../core/chat_notification_service.dart';
@@ -27,6 +28,7 @@ class InitialBinding extends Bindings {
     Get.put(ChatNotificationService(), permanent: true);
     Get.put(RideNotificationService(), permanent: true);
     Get.put(NotificationSoundService(), permanent: true);
+    Get.put(PushService(), permanent: true);
     Get.put(DatabaseHelper(), permanent: true);
     Get.put(BackgroundTrackingService(), permanent: true);
     Get.put(UnifiedSignalRService(), permanent: true);

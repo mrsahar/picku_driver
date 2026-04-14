@@ -1,5 +1,11 @@
 import 'package:intl/intl.dart';
 
+double _parseDouble(dynamic value) {
+  if (value == null) return 0.0;
+  if (value is num) return value.toDouble();
+  return double.tryParse(value.toString()) ?? 0.0;
+}
+
 class RideHistoryResponse {
   final List<RideItem> items;
   final int completedRides;
@@ -63,6 +69,8 @@ class RideItem {
   final int passengerCount;
   final double fareEstimate;
   final double fareFinal;
+  /// Passenger tip (API: `tipAmount`).
+  final double tipAmount;
   final String status;
   final double distance;
   final double? adminCommission;
@@ -87,6 +95,7 @@ class RideItem {
     required this.passengerCount,
     required this.fareEstimate,
     required this.fareFinal,
+    this.tipAmount = 0.0,
     required this.status,
     required this.distance,
     this.adminCommission,
@@ -113,6 +122,7 @@ class RideItem {
       passengerCount: json['passengerCount'] ?? 0,
       fareEstimate: (json['fareEstimate'] ?? 0.0).toDouble(),
       fareFinal: (json['fareFinal'] ?? 0.0).toDouble(),
+      tipAmount: _parseDouble(json['tipAmount']),
       status: json['status'] ?? '',
       distance: (json['distance'] ?? 0.0).toDouble(),
       adminCommission: json['adminCommission']?.toDouble(),

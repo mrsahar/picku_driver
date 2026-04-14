@@ -6,7 +6,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:signalr_core/signalr_core.dart';
+import 'package:signalr_netcore/signalr_client.dart';
 
 // ============================================================
 // Background Service Initializer
@@ -101,6 +101,7 @@ Future<void> onStart(ServiceInstance service) async {
 
   // ── Track current ride ID (updated from UI or from events) ──
   String currentRideId = '';
+  int lastRideChatSequence = 0;
 
   // ── Track last location send time (for timer fallback) ──
   DateTime lastSendTime = DateTime.now();
@@ -111,11 +112,11 @@ Future<void> onStart(ServiceInstance service) async {
     hubConnection = HubConnectionBuilder()
         .withUrl(
       _hubUrl,
-      HttpConnectionOptions(
+      options: HttpConnectionOptions(
         accessTokenFactory: () async => jwtToken,
       ),
     )
-        .withAutomaticReconnect([2000, 5000, 10000, 15000, 30000])
+        .withAutomaticReconnect(retryDelays: [2000, 5000, 10000, 15000, 30000])
         .build();
 
     print('✅ SAHAr [BG-ISO] HubConnection built');
@@ -127,17 +128,17 @@ Future<void> onStart(ServiceInstance service) async {
   }
 
   // ── Connection state handlers ──
-  hubConnection.onclose((error) {
+  hubConnection.onclose(({error}) {
     print('🔴 SAHAr [BG-ISO] SignalR closed: $error');
     service.invoke('bg_connectionState', {'state': 'disconnected', 'error': error?.toString()});
   });
 
-  hubConnection.onreconnecting((error) {
+  hubConnection.onreconnecting(({error}) {
     print('🟡 SAHAr [BG-ISO] SignalR reconnecting: $error');
     service.invoke('bg_connectionState', {'state': 'reconnecting', 'error': error?.toString()});
   });
 
-  hubConnection.onreconnected((connectionId) {
+  hubConnection.onreconnected(({connectionId}) {
     print('🟢 SAHAr [BG-ISO] SignalR reconnected: $connectionId');
     service.invoke('bg_connectionState', {'state': 'connected', 'connectionId': connectionId});
 
@@ -232,12 +233,40 @@ Future<void> onStart(ServiceInstance service) async {
       try {
         final data = args[0];
         if (data is Map<String, dynamic>) {
+          final seq = data['Sequence'] ?? data['sequence'];
+          final s = seq is int ? seq : int.tryParse(seq?.toString() ?? '');
+          if (s != null && s > lastRideChatSequence) lastRideChatSequence = s;
           service.invoke('bg_ReceiveMessage', data);
         } else {
           service.invoke('bg_ReceiveMessage', {'raw': data.toString()});
         }
       } catch (e) {
         print('❌ SAHAr [BG-ISO] Error parsing ReceiveMessage: $e');
+      }
+    }
+  });
+
+  hubConnection.on('ReceiveMessageReplay', (List<Object?>? args) {
+    print('💬 SAHAr [BG-ISO] ReceiveMessageReplay');
+    if (args != null && args.isNotEmpty) {
+      try {
+        final data = args[0];
+        if (data is List) {
+          final list = data.map((e) {
+            if (e is Map<String, dynamic>) return e;
+            return {'raw': e.toString()};
+          }).toList();
+          for (final item in list) {
+            final seq = item['Sequence'] ?? item['sequence'];
+            final s = seq is int ? seq : int.tryParse(seq?.toString() ?? '');
+            if (s != null && s > lastRideChatSequence) lastRideChatSequence = s;
+          }
+          service.invoke('bg_ReceiveMessageReplay', {'messages': list});
+        } else {
+          service.invoke('bg_ReceiveMessageReplay', {'raw': data.toString()});
+        }
+      } catch (e) {
+        print('❌ SAHAr [BG-ISO] Error parsing ReceiveMessageReplay: $e');
       }
     }
   });
@@ -253,6 +282,11 @@ Future<void> onStart(ServiceInstance service) async {
             if (e is Map<String, dynamic>) return e;
             return {'raw': e.toString()};
           }).toList();
+          for (final item in list) {
+            final seq = item['Sequence'] ?? item['sequence'];
+            final s = seq is int ? seq : int.tryParse(seq?.toString() ?? '');
+            if (s != null && s > lastRideChatSequence) lastRideChatSequence = s;
+          }
           service.invoke('bg_ReceiveRideChatHistory', {'messages': list});
         }
       } catch (e) {
@@ -444,8 +478,13 @@ Future<void> onStart(ServiceInstance service) async {
   service.on('joinRideChat').listen((event) async {
     if (event != null && event['rideId'] != null && hubConnection != null) {
       String rideId = event['rideId'].toString();
+      final afterSeqRaw = event['afterSequence'];
+      final afterSeq = afterSeqRaw is int
+          ? afterSeqRaw
+          : int.tryParse(afterSeqRaw?.toString() ?? '') ?? 0;
       currentRideId = rideId;
-      await _joinRideChat(hubConnection!, rideId);
+      final effectiveAfterSeq = afterSeq > 0 ? afterSeq : lastRideChatSequence;
+      await _joinRideChat(hubConnection, rideId, afterSequence: effectiveAfterSeq);
     }
   });
 
@@ -453,7 +492,7 @@ Future<void> onStart(ServiceInstance service) async {
   service.on('loadRideChatHistory').listen((event) async {
     if (event != null && event['rideId'] != null && hubConnection != null) {
       try {
-        await hubConnection!.invoke('GetRideChatHistory', args: [event['rideId']]);
+        await hubConnection.invoke('GetRideChatHistory', args: [event['rideId']]);
         print('📜 SAHAr [BG-ISO] Chat history requested for: ${event['rideId']}');
       } catch (e) {
         print('❌ SAHAr [BG-ISO] Error requesting chat history: $e');
@@ -465,7 +504,7 @@ Future<void> onStart(ServiceInstance service) async {
   service.on('sendRideChatMessage').listen((event) async {
     if (event != null && hubConnection != null) {
       try {
-        await hubConnection!.invoke('SendMessage', args: [
+        await hubConnection.invoke('SendMessage', args: [
           event['rideId'] ?? currentRideId,
           event['senderId'] ?? driverId,
           event['message'] ?? '',
@@ -482,7 +521,7 @@ Future<void> onStart(ServiceInstance service) async {
   // Join driver support from UI
   service.on('joinDriverSupport').listen((event) async {
     try {
-      await hubConnection!.invoke('JoinDriverSupport', args: [driverId]);
+      await hubConnection?.invoke('JoinDriverSupport', args: [driverId]);
       print('🎧 SAHAr [BG-ISO] Joined driver support group');
     } catch (e) {
       print('❌ SAHAr [BG-ISO] Error joining driver support: $e');
@@ -492,7 +531,7 @@ Future<void> onStart(ServiceInstance service) async {
   // Load driver-admin chat history from UI
   service.on('loadAdminChatHistory').listen((event) async {
     try {
-      await hubConnection!.invoke('GetDriverAdminChatHistory', args: [driverId]);
+      await hubConnection?.invoke('GetDriverAdminChatHistory', args: [driverId]);
       print('📜 SAHAr [BG-ISO] Admin chat history requested');
     } catch (e) {
       print('❌ SAHAr [BG-ISO] Error requesting admin chat history: $e');
@@ -503,7 +542,7 @@ Future<void> onStart(ServiceInstance service) async {
   service.on('sendAdminMessage').listen((event) async {
     if (event != null && event['message'] != null) {
       try {
-        await hubConnection!.invoke('SendDriverAdminMessage', args: [
+        await hubConnection?.invoke('SendDriverAdminMessage', args: [
           driverId,
           driverId,
           'Driver',
@@ -519,18 +558,20 @@ Future<void> onStart(ServiceInstance service) async {
 
   // Subscribe to rides from UI
   service.on('subscribeDriver').listen((event) async {
-    await _subscribeDriver(hubConnection!, driverId);
+    if (hubConnection != null) {
+      await _subscribeDriver(hubConnection, driverId);
+    }
   });
 
   // Force reconnect from UI
   service.on('reconnect').listen((event) async {
     print('🔄 SAHAr [BG-ISO] Force reconnect requested');
     try {
-      if (hubConnection!.state == HubConnectionState.disconnected) {
-        await hubConnection!.start();
+      if (hubConnection != null && hubConnection.state == HubConnectionState.Disconnected) {
+        await hubConnection.start();
         print('✅ SAHAr [BG-ISO] Reconnected');
         service.invoke('bg_connectionState', {'state': 'connected'});
-        await _subscribeDriver(hubConnection!, driverId);
+        await _subscribeDriver(hubConnection, driverId);
       }
     } catch (e) {
       print('❌ SAHAr [BG-ISO] Reconnect failed: $e');
@@ -569,7 +610,7 @@ Future<void> onStart(ServiceInstance service) async {
 /// Subscribe driver for ride assignments
 Future<void> _subscribeDriver(HubConnection hub, String driverId) async {
   try {
-    if (hub.state != HubConnectionState.connected) {
+    if (hub.state != HubConnectionState.Connected) {
       print('⚠️ SAHAr [BG-ISO] Cannot subscribe: not connected');
       return;
     }
@@ -581,11 +622,13 @@ Future<void> _subscribeDriver(HubConnection hub, String driverId) async {
 }
 
 /// Join ride chat room
-Future<void> _joinRideChat(HubConnection hub, String rideId) async {
+Future<void> _joinRideChat(HubConnection hub, String rideId, {int afterSequence = 0}) async {
   try {
-    if (hub.state != HubConnectionState.connected) return;
-    await hub.invoke('JoinRideChat', args: [rideId]);
-    print('💬 SAHAr [BG-ISO] Joined ride chat: $rideId');
+    if (hub.state != HubConnectionState.Connected) return;
+    // Always pass both args. Server method is `JoinRideChat(Guid rideId, long lastReceivedSequence = 0)`.
+    // Some SignalR clients do not apply optional/default parameters reliably when args are omitted.
+    await hub.invoke('JoinRideChat', args: [rideId, afterSequence]);
+    print('💬 SAHAr [BG-ISO] Joined ride chat: $rideId (afterSequence=$afterSequence)');
   } catch (e) {
     print('❌ SAHAr [BG-ISO] Error joining ride chat: $e');
   }
@@ -602,7 +645,7 @@ Future<void> _sendLocation(
   double longitude,
 ) async {
   try {
-    if (hub.state != HubConnectionState.connected) {
+    if (hub.state != HubConnectionState.Connected) {
       print('⚠️ SAHAr [BG-ISO] Cannot send location: not connected');
       return;
     }

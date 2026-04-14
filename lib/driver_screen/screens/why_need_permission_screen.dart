@@ -207,12 +207,12 @@ class _WhyNeedPermissionScreenState extends State<WhyNeedPermissionScreen> {
                         const SizedBox(height: 12),
                         _buildFeatureItem(
                           Icons.navigation_rounded,
-                          'Real-time navigation even if your screen is off',
+                          'Real-time navigation',
                           isDark,
                         ),
                         _buildFeatureItem(
                           Icons.my_location_rounded,
-                          'Driver background location tracking',
+                          'Driver background location',
                           isDark,
                         ),
                         _buildFeatureItem(

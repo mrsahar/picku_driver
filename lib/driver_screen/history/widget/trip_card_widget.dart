@@ -177,26 +177,55 @@ class TripHistoryCard extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            // Fare
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            // Earnings & tip
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  'Fare: ',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Fare: ',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      '\$${(double.tryParse(ride.driverPayment ?? '') ?? 0.0).toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: MColor.primaryNavy,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                    '\$${(double.tryParse(ride.driverPayment!) ?? 0.0).toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: MColor.primaryNavy,
-                    fontWeight: FontWeight.w700,
+                if (ride.tipAmount > 0) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(
+                        'Tip: ',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        '\$${ride.tipAmount.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.green.shade700,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                ],
               ],
             ),
           ],

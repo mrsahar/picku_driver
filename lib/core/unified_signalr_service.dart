@@ -101,6 +101,22 @@ class UnifiedSignalRService extends GetxService {
   void onInit() {
     super.onInit();
     _listenToBackgroundService();
+    _autoJoinRideChatOnRideChange();
+  }
+
+  void _autoJoinRideChatOnRideChange() {
+    // Ensure we join ride chat even if user never opens the chat screen.
+    ever<String>(currentRideId, (rideId) async {
+      if (rideId.isEmpty) return;
+      try {
+        // Join chat group in background isolate (with afterSequence replay).
+        await joinRideChat(rideId);
+        // Fetch history (caller-scoped) for immediate state.
+        await loadRideChatHistory(rideId);
+      } catch (e) {
+        print('⚠️ SAHAr Auto-join ride chat failed: $e');
+      }
+    });
   }
 
   // ══════════════════════════════════════════════════════════
@@ -159,19 +175,26 @@ class UnifiedSignalRService extends GetxService {
         if (event['rideId'] != null) {
           currentRideId.value = event['rideId'].toString();
         }
-        // Sync full ride to UI: parse and set currentRide + BackgroundTrackingService so home_screen etc. update
+        // Sync to UI. Server often sends partial payloads (e.g. merged
+        // NewRideAssigned with only { status: Payment Received }) — those must
+        // still reach BackgroundTrackingService or payment/status UI never updates.
         try {
           final data = Map<String, dynamic>.from(event as Map);
-          if (data['rideId'] != null && data['pickUpLat'] != null) {
+          final hasFullRidePayload =
+              data['rideId'] != null && data['pickUpLat'] != null;
+          if (hasFullRidePayload) {
             final ride = RideAssignment.fromJson(data);
             currentRide.value = ride;
             rideStatus.value = ride.status;
-            if (Get.isRegistered<BackgroundTrackingService>()) {
-              final bg = BackgroundTrackingService.to;
-              // Delegate to BackgroundTrackingService so it runs the full
-              // assignment flow: sets currentRide + draws route on map.
-              bg.onNewRideAssigned(data);
+          } else if (data['status'] != null) {
+            rideStatus.value = data['status'].toString();
+          }
+          if (Get.isRegistered<BackgroundTrackingService>()) {
+            final bg = BackgroundTrackingService.to;
+            if (data['status'] != null) {
+              bg.rideStatus.value = data['status'].toString();
             }
+            bg.onNewRideAssigned(data);
           }
         } catch (e) {
           print('⚠️ SAHAr [UI] NewRideAssigned parse/sync: $e');
@@ -268,6 +291,25 @@ class UnifiedSignalRService extends GetxService {
         final messages = event['messages'];
         if (messages is List) {
           _handleRideChatHistory(messages.cast<dynamic>());
+        }
+      }),
+    );
+
+    // --- Ride Chat: Replay (missed messages after reconnect/join) ---
+    _bgSubscriptions.add(
+      _bgService.on('bg_ReceiveMessageReplay').listen((event) {
+        if (event == null) return;
+        print('📜 SAHAr [UI] ReceiveMessageReplay');
+        final messages = event['messages'];
+        if (messages is List) {
+          for (final item in messages) {
+            if (item is Map) {
+              _handleRideChatMessage(Map<String, dynamic>.from(item));
+            } else {
+              // Best-effort fallback for unexpected payloads
+              _handleRideChatMessage({'raw': item.toString()});
+            }
+          }
         }
       }),
     );
@@ -414,11 +456,21 @@ class UnifiedSignalRService extends GetxService {
   // RIDE CHAT (delegate to background)
   // ══════════════════════════════════════════════════════════
 
+  int get _maxKnownChatSequence {
+    var m = 0;
+    for (final msg in rideChatMessages) {
+      final s = msg.sequence;
+      if (s != null && s > m) m = s;
+    }
+    return m;
+  }
+
   /// Join ride chat group
   Future<void> joinRideChat(String rideId) async {
     if (rideId.isNotEmpty) {
-      _bgService.invoke('joinRideChat', {'rideId': rideId});
-      print('💬 SAHAr Join ride chat requested: $rideId');
+      final lastSeq = _maxKnownChatSequence;
+      _bgService.invoke('joinRideChat', {'rideId': rideId, 'afterSequence': lastSeq});
+      print('💬 SAHAr Join ride chat requested: $rideId (afterSequence=$lastSeq)');
     }
   }
 

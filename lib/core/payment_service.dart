@@ -121,14 +121,20 @@ class PaymentService {
       );
 
       if (transferResult == null) {
-        print('WARNING: Payment captured but transfer failed! ');
-        // You should handle this case - maybe queue for retry
+        print(
+            'WARNING: Payment captured but transfer failed — full amount remains on platform (admin).');
         return {
-          'success': false,
-          'captured':  true,
+          'success': true,
+          'captured': true,
           'transferred': false,
-          'error': 'Transfer to driver failed',
-          'payment_intent_id':  paymentIntentId,
+          'admin_only': true,
+          'error': 'Transfer to driver failed; funds kept on platform',
+          'payment_intent_id': paymentIntentId,
+          'transfer_id': null,
+          'total_amount': totalAmountCents,
+          'driver_amount': 0,
+          'platform_fee': totalAmountCents,
+          'tip_amount': tipAmount,
         };
       }
 

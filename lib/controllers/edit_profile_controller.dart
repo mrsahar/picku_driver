@@ -288,14 +288,20 @@ class EditProfileController extends GetxController {
   Future<void> _submitProfileUpdate() async {
     try {
       isLoading.value = true;
-      final userId = user.value?.userId ?? '';
+      final fallbackId = await SharedPrefsService.getUserId() ?? '';
+      final userId = (user.value?.userId.trim().isNotEmpty ?? false)
+          ? user.value!.userId.trim()
+          : fallbackId.trim();
       final imagePath = selectedImagePath.value;
 
       // Create FormData manually
       final formData = FormData({});
 
       formData.fields.addAll([
-        MapEntry('UserId', userId),
+        // Backend accepts id/userId/driverId. Send all to be safe.
+        MapEntry('id', userId),
+        MapEntry('userId', userId),
+        MapEntry('driverId', userId),
         MapEntry('FullName', txtUserName.text.trim()),
         MapEntry('PhoneNumber', txtMobile.text.trim()),
         MapEntry('Address', txtAddress.text.trim()),

@@ -25,7 +25,17 @@ class ApiProvider extends GetConnect {
 
     // Add request interceptor
     httpClient.addRequestModifier<dynamic>((request) {
-      request.headers['Content-Type'] = 'application/json';
+      // Don't override multipart boundaries when sending FormData.
+      final existingCt =
+          request.headers['content-type'] ?? request.headers['Content-Type'];
+      if (existingCt != null &&
+          existingCt.toLowerCase().startsWith('multipart/form-data')) {
+        // Normalize to a single header key to avoid duplicate content-type.
+        request.headers.remove('Content-Type');
+        request.headers['content-type'] = existingCt;
+      } else if (existingCt == null) {
+        request.headers['Content-Type'] = 'application/json';
+      }
       if (_globalVars.userToken.isNotEmpty) {
         request.headers['Authorization'] = 'Bearer ${_globalVars.userToken}';
       }

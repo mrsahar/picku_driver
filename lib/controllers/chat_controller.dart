@@ -68,8 +68,8 @@ class ChatController extends GetxController {
       print('🔄 SAHAr Initializing chat...');
       print('🔄 SAHAr Using direct binding to UnifiedSignalRService messages');
 
-      // Mark that user is on chat screen (no notifications while here)
-      _notificationService.setOnChatScreen(true);
+      // No OS chat alerts while this ride's thread is on screen.
+      _notificationService.setOnChatScreen(true, rideId: rideId.value);
 
       // Request notification permission if not already requested
       if (!_notificationService.hasRequestedPermission.value) {
@@ -225,6 +225,8 @@ class ChatController extends GetxController {
       _signalRService.joinRideChat(rideId);
       _loadChatHistory();
     }
+
+    _notificationService.setOnChatScreen(true, rideId: this.rideId.value);
   }
 
   @override

@@ -113,6 +113,8 @@ class ProfileScreen extends StatelessWidget {
                 _buildProfileDetailSection('Personal Information', [
                   _buildDetailRow('Full Name', user.name),
                   _buildDetailRow('Phone', user.phoneNumber),
+                  if (user.address != null && user.address!.isNotEmpty)
+                    _buildDetailRow('Address', user.address!),
                   if (user.email != null && user.email!.isNotEmpty)
                     _buildDetailRow('Email', user.email!),
                   if (user.status != null && user.status!.isNotEmpty)
@@ -121,18 +123,30 @@ class ProfileScreen extends StatelessWidget {
                 const SizedBox(height: 20),
 
                 /// -- LICENSE & VEHICLE SECTION
-                if (user.licenseNumber != null && user.licenseNumber!.isNotEmpty ||
-                    user.carLicensePlate != null && user.carLicensePlate!.isNotEmpty ||
-                    user.vehicleName != null && user.vehicleName!.isNotEmpty ||
-                    user.vehicleColor != null && user.vehicleColor!.isNotEmpty)
+                if ((user.licenseNumber != null && user.licenseNumber!.isNotEmpty) ||
+                    (user.sin != null && user.sin!.isNotEmpty) ||
+                    (user.carLicensePlate != null && user.carLicensePlate!.isNotEmpty) ||
+                    (user.carVin != null && user.carVin!.isNotEmpty) ||
+                    (user.carRegistration != null && user.carRegistration!.isNotEmpty) ||
+                    (user.carInsurance != null && user.carInsurance!.isNotEmpty) ||
+                    (user.vehicleName != null && user.vehicleName!.isNotEmpty) ||
+                    (user.vehicleColor != null && user.vehicleColor!.isNotEmpty))
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildProfileDetailSection('License & Vehicle Information', [
                         if (user.licenseNumber != null && user.licenseNumber!.isNotEmpty)
                           _buildDetailRow('License Number', user.licenseNumber!),
+                        if (user.sin != null && user.sin!.isNotEmpty)
+                          _buildDetailRow('SIN', user.sin!),
                         if (user.carLicensePlate != null && user.carLicensePlate!.isNotEmpty)
                           _buildDetailRow('Car License Plate', user.carLicensePlate!),
+                        if (user.carVin != null && user.carVin!.isNotEmpty)
+                          _buildDetailRow('Car VIN', user.carVin!),
+                        if (user.carRegistration != null && user.carRegistration!.isNotEmpty)
+                          _buildDetailRow('Car Registration', user.carRegistration!),
+                        if (user.carInsurance != null && user.carInsurance!.isNotEmpty)
+                          _buildDetailRow('Car Insurance', user.carInsurance!),
                         if (user.vehicleName != null && user.vehicleName!.isNotEmpty)
                           _buildDetailRow('Vehicle Name', user.vehicleName!),
                         if (user.vehicleColor != null && user.vehicleColor!.isNotEmpty)

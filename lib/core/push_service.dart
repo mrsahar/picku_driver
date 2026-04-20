@@ -6,8 +6,10 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:pick_u_driver/core/chat_notification_service.dart';
+import 'package:pick_u_driver/core/driver_service.dart';
 import 'package:pick_u_driver/core/global_variables.dart';
 import 'package:pick_u_driver/core/ride_notification_service.dart';
+import 'package:pick_u_driver/core/background_tracking_service.dart';
 import 'package:pick_u_driver/core/sharePref.dart';
 import 'package:pick_u_driver/providers/api_provider.dart';
 import 'package:pick_u_driver/routes/app_routes.dart';
@@ -255,9 +257,23 @@ class PushService extends GetxService {
 
     switch (type) {
       case 'ride_chat_message':
+        final pushSid =
+            (data['senderId'] ?? data['sender_id'] ?? '').toString().trim();
+        final myDriverId =
+            Get.isRegistered<DriverService>()
+                ? (DriverService.to.driverId.value ?? '').trim()
+                : '';
+        if (pushSid.isNotEmpty &&
+            myDriverId.isNotEmpty &&
+            pushSid.toLowerCase() == myDriverId.toLowerCase()) {
+          print(
+              'PickU Driver PushService: skip chat FCM notification — sender is driver');
+          break;
+        }
         if (Get.isRegistered<ChatNotificationService>() && rideId.isNotEmpty) {
           await ChatNotificationService.to.showChatMessageNotification(
-            senderName: (data['senderName'] ?? data['senderRole'] ?? 'Passenger').toString(),
+            senderName:
+                (data['senderName'] ?? data['senderRole'] ?? 'Passenger').toString(),
             message: body,
             rideId: rideId,
           );
@@ -273,6 +289,21 @@ class PushService extends GetxService {
             status: type,
             isHighPriority: false,
           );
+        }
+        // Same ride update may arrive via FCM while the SignalR hub runs in the isolate — mirror completion UX.
+        if (type == 'payment_success' &&
+            Get.isRegistered<BackgroundTrackingService>() &&
+            rideId.isNotEmpty) {
+          final bg = BackgroundTrackingService.to;
+          final cur = bg.currentRide.value;
+          if (cur != null &&
+              cur.rideId == rideId &&
+              (bg.isWaitingForPayment.value || bg.showPaymentDialog.value)) {
+            bg.onPaymentCompletedFromBackground({
+              'rideId': rideId,
+              if (data['tip'] != null) 'tip': data['tip'],
+            });
+          }
         }
         break;
       default:

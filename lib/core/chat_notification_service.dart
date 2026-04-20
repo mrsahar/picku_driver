@@ -21,6 +21,9 @@ class ChatNotificationService extends GetxService {
   var hasRequestedPermission = false.obs;
   var isOnChatScreen = false.obs;
 
+  /// Ride whose chat UI is currently focused ([setOnChatScreen](true, rideId: …)).
+  final RxString focusedChatRideId = ''.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -157,9 +160,31 @@ class ChatNotificationService extends GetxService {
     required String message,
     required String rideId,
   }) async {
-    // Don't show notification if user is on chat screen
-    if (isOnChatScreen.value) {
-      print('⏭️ SAHAr Skipping notification - user is on chat screen');
+    final rid = rideId.trim();
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    final inForeground =
+        lifecycle == null || lifecycle == AppLifecycleState.resumed;
+
+    // Top route is ride chat — never banner while reading this thread.
+    try {
+      final route = Get.currentRoute;
+      if (route == AppRoutes.chatScreen ||
+          route.endsWith(AppRoutes.chatScreen)) {
+        print(
+            '⏭️ SAHAr Skipping chat notification — chat route is foreground ($route)');
+        return;
+      }
+    } catch (_) {}
+
+    // Same ride chat is open (handles stacks where [Get.currentRoute] is not /chatScreen).
+    final focused = focusedChatRideId.value.trim();
+    if (rid.isNotEmpty &&
+        focused.isNotEmpty &&
+        rid.toLowerCase() == focused.toLowerCase() &&
+        isOnChatScreen.value &&
+        inForeground) {
+      print(
+          '⏭️ SAHAr Skipping notification — chat open for this ride ($rid)');
       return;
     }
 
@@ -183,6 +208,9 @@ class ChatNotificationService extends GetxService {
         }
       }
 
+      final displayTitle =
+          senderName.trim().isEmpty ? 'Chat' : senderName.trim();
+
       final AndroidNotificationDetails androidPlatformChannelSpecifics =
           AndroidNotificationDetails(
         chatChannelId,
@@ -193,7 +221,9 @@ class ChatNotificationService extends GetxService {
         showWhen: true,
         enableVibration: true,
         playSound: useSystemSound,
-        styleInformation: const BigTextStyleInformation(''),
+        styleInformation: BigTextStyleInformation(
+          message.isNotEmpty ? message : ' ',
+        ),
         category: AndroidNotificationCategory.message,
         icon: '@drawable/ic_notification',
       );
@@ -212,22 +242,29 @@ class ChatNotificationService extends GetxService {
 
       await _flutterLocalNotificationsPlugin.show(
         DateTime.now().millisecondsSinceEpoch.remainder(100000),
-        'Message from Passenger',
+        'Message from $displayTitle',
         message,
         platformChannelSpecifics,
         payload: rideId, // Pass rideId for navigation
       );
 
-      print('🔔 SAHAr Chat notification shown for message from $senderName');
+      print(
+          '🔔 SAHAr Chat notification shown — title uses sender: $displayTitle');
     } catch (e) {
       print('❌ SAHAr Error showing chat notification: $e');
     }
   }
 
-  /// Mark that user is on chat screen
-  void setOnChatScreen(bool isOnScreen) {
+  /// Mark that user is on chat screen (optionally which [rideId] thread).
+  void setOnChatScreen(bool isOnScreen, {String? rideId}) {
     isOnChatScreen.value = isOnScreen;
-    print('📱 SAHAr isOnChatScreen: $isOnScreen');
+    if (!isOnScreen || rideId == null || rideId.trim().isEmpty) {
+      focusedChatRideId.value = '';
+    } else {
+      focusedChatRideId.value = rideId.trim();
+    }
+    print(
+        '📱 SAHAr isOnChatScreen: $isOnScreen focusedRide: ${focusedChatRideId.value}');
   }
 
   /// Show permission request dialog

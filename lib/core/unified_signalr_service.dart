@@ -220,12 +220,21 @@ class UnifiedSignalRService extends GetxService {
       _bgService.on('bg_RideStatusUpdate').listen((event) {
         if (event == null) return;
         print('📊 SAHAr [UI] RideStatusUpdate: $event');
-        if (event['status'] != null) {
-          final status = event['status'].toString();
-          rideStatus.value = status;
-          if (Get.isRegistered<BackgroundTrackingService>()) {
-            BackgroundTrackingService.to.rideStatus.value = status;
+        try {
+          final map = Map<String, dynamic>.from(event as Map);
+          if (map['status'] != null) {
+            final status = map['status'].toString();
+            rideStatus.value = status;
+            if (Get.isRegistered<BackgroundTrackingService>()) {
+              BackgroundTrackingService.to.rideStatus.value = status;
+            }
           }
+          // Must process the full payload (e.g. "Payment Received") — not only the status string.
+          if (Get.isRegistered<BackgroundTrackingService>()) {
+            BackgroundTrackingService.to.onRideStatusUpdateFromBackground(map);
+          }
+        } catch (e) {
+          print('⚠️ SAHAr [UI] RideStatusUpdate handling: $e');
         }
       }),
     );
@@ -340,6 +349,14 @@ class UnifiedSignalRService extends GetxService {
       _bgService.on('bg_PaymentCompleted').listen((event) {
         if (event == null) return;
         print('💰 SAHAr [UI] PaymentCompleted: $event');
+        try {
+          final data = Map<String, dynamic>.from(event as Map);
+          if (Get.isRegistered<BackgroundTrackingService>()) {
+            BackgroundTrackingService.to.onPaymentCompletedFromBackground(data);
+          }
+        } catch (e) {
+          print('⚠️ SAHAr [UI] PaymentCompleted handling: $e');
+        }
       }),
     );
 
@@ -627,15 +644,23 @@ class UnifiedSignalRService extends GetxService {
   // EVENT HANDLERS (process data FROM background service)
   // ══════════════════════════════════════════════════════════
 
+  static String _normalizeParticipantId(String id) {
+    return id.trim().replaceAll(RegExp(r'[\{\}]'), '').toLowerCase();
+  }
+
+  /// True when this message was sent by the logged-in driver (own echo), not the passenger.
+  bool _isMessageFromThisDriver(ChatMessage msg) {
+    final did = _driverId;
+    if (did == null || did.trim().isEmpty) return false;
+    return _normalizeParticipantId(msg.senderId) == _normalizeParticipantId(did);
+  }
+
   void _handleRideChatMessage(Map<String, dynamic> messageData) {
     try {
       print('📨 SAHAr _handleRideChatMessage: $messageData');
 
       final chatMessage = ChatMessage.fromJson(messageData);
-      final userId = _driverId ?? '';
-
-      final isFromCurrentUser = chatMessage.senderRole.toLowerCase() == 'driver' ||
-          chatMessage.senderId == userId;
+      final isFromCurrentUser = _isMessageFromThisDriver(chatMessage);
 
       // Check for duplicates
       if (isFromCurrentUser && _recentlySentMessages.containsKey(chatMessage.message)) {
@@ -660,9 +685,11 @@ class UnifiedSignalRService extends GetxService {
         message: messageWithUserFlag,
       );
 
-      // Show notification for passenger messages
+      // Notify only for the other party (passenger / rider), not for our own echo.
       if (!isFromCurrentUser) {
         _showChatNotification(chatMessage);
+      } else {
+        print('🔕 SAHAr Skip chat notification — driver\'s own message');
       }
     } catch (e) {
       print('❌ SAHAr Error handling ride chat message: $e');
@@ -680,13 +707,11 @@ class UnifiedSignalRService extends GetxService {
       }
 
       List<ChatMessage> loadedMessages = [];
-      final userId = _driverId ?? '';
 
       for (var messageData in chatHistory) {
         try {
           final chatMessage = ChatMessage.fromJson(messageData as Map<String, dynamic>);
-          final isFromCurrentUser = chatMessage.senderRole.toLowerCase() == 'driver' ||
-              chatMessage.senderId == userId;
+          final isFromCurrentUser = _isMessageFromThisDriver(chatMessage);
           loadedMessages.add(chatMessage.copyWith(isFromCurrentUser: isFromCurrentUser));
         } catch (e) {
           print('❌ SAHAr Error processing ride chat message: $e');
@@ -808,13 +833,16 @@ class UnifiedSignalRService extends GetxService {
       if (Get.isRegistered<ChatNotificationService>()) {
         final notificationService = Get.find<ChatNotificationService>();
 
+        // Passenger app sends senderRole "Rider"; treat like "Passenger".
         String senderName = 'Passenger';
-        if (chatMessage.senderRole.toLowerCase() == 'passenger') {
+        final role = chatMessage.senderRole.toLowerCase();
+        if (role == 'passenger' || role == 'rider') {
           try {
             if (Get.isRegistered<BackgroundTrackingService>()) {
               final backgroundService = Get.find<BackgroundTrackingService>();
               if (backgroundService.currentRide.value != null) {
-                senderName = backgroundService.currentRide.value!.passengerName;
+                final pn = backgroundService.currentRide.value!.passengerName.trim();
+                if (pn.isNotEmpty) senderName = pn;
               }
             }
           } catch (e) {
@@ -822,10 +850,14 @@ class UnifiedSignalRService extends GetxService {
           }
         }
 
+        final r1 = currentRideId.value.trim();
+        final r2 = chatMessage.rideId.trim();
+        final notifyRideId = r1.isNotEmpty ? r1 : r2;
+
         notificationService.showChatMessageNotification(
           senderName: senderName,
           message: chatMessage.message,
-          rideId: currentRideId.value,
+          rideId: notifyRideId,
         );
       }
     } catch (e) {

@@ -64,6 +64,12 @@ class BackgroundTrackingService extends GetxService {
   var paymentCompleted = false.obs;
   var showPaymentDialog = false.obs;
 
+  /// Avoid stacking duplicate "Payment Received!" dialogs when multiple server events fire.
+  String? _rideIdShownPaymentSuccessDialog;
+
+  /// After OK / dismiss / reset, hub may replay the same completed ride — suppress duplicate UI/notifications.
+  String? _rideIdPaymentFlowDismissed;
+
   // Ride assignment observables
   var isSubscribed = false.obs;
   var currentRide = Rxn<RideAssignment>();
@@ -567,6 +573,17 @@ class BackgroundTrackingService extends GetxService {
   }
 
   void showPaymentSuccessPopup({required double fareFinal, required double tip}) {
+    final currentId = currentRide.value?.rideId;
+    if (currentId != null &&
+        currentId.isNotEmpty &&
+        _rideIdShownPaymentSuccessDialog == currentId) {
+      print('⏭️ SAHAr Payment success dialog already shown for ride $currentId');
+      return;
+    }
+    if (currentId != null && currentId.isNotEmpty) {
+      _rideIdShownPaymentSuccessDialog = currentId;
+    }
+
     final bool hasTip = tip > 0;
     final double total = fareFinal + tip;
 
@@ -796,6 +813,108 @@ class BackgroundTrackingService extends GetxService {
     );
   }
 
+  /// Server may send different casing for the same status.
+  bool _statusMeansPaymentReceived(dynamic status) {
+    if (status == null) return false;
+    return status.toString().trim().toLowerCase() == 'payment received';
+  }
+
+  /// Shared handler for [PaymentCompleted] — used by foreground hub and by
+  /// [UnifiedSignalRService] when the event is forwarded from the background isolate.
+  void _handlePaymentCompletedPayload(Map<String, dynamic> paymentData) {
+    try {
+      final String rideId = paymentData['rideId']?.toString() ?? '';
+      print('💰 SAHAr Payment data received: $paymentData');
+
+      if (currentRide.value == null || currentRide.value!.rideId != rideId) {
+        print('⚠️ SAHAr Cannot update payment - no current ride or ride ID mismatch');
+        return;
+      }
+
+      if (currentRide.value!.payment == 'Successful') {
+        print('⏭️ SAHAr Payment already successful for this ride — skipping duplicate event');
+        return;
+      }
+
+      double tip = 0.0;
+      if (paymentData['tip'] != null) {
+        if (paymentData['tip'] is int) {
+          tip = (paymentData['tip'] as int).toDouble();
+        } else if (paymentData['tip'] is double) {
+          tip = paymentData['tip'] as double;
+        } else {
+          tip = double.tryParse(paymentData['tip'].toString()) ?? 0.0;
+        }
+      }
+
+      print('💰 SAHAr Parsed tip: \$${tip.toStringAsFixed(2)}');
+
+      final updatedRideData = {
+        'rideId': currentRide.value!.rideId,
+        'rideType': currentRide.value!.rideType,
+        'fareEstimate': currentRide.value!.fareEstimate,
+        'fareFinal': currentRide.value!.fareFinal,
+        'createdAt': currentRide.value!.createdAt.toIso8601String(),
+        'status': 'Completed',
+        'passengerId': currentRide.value!.passengerId,
+        'passengerName': currentRide.value!.passengerName,
+        'passengerPhone': currentRide.value!.passengerPhone,
+        'pickupLocation': currentRide.value!.pickupLocation,
+        'pickUpLat': currentRide.value!.pickUpLat,
+        'pickUpLon': currentRide.value!.pickUpLon,
+        'dropoffLocation': currentRide.value!.dropoffLocation,
+        'dropoffLat': currentRide.value!.dropoffLat,
+        'dropoffLon': currentRide.value!.dropoffLon,
+        'stops': currentRide.value!.stops.map((s) => {
+              'stopOrder': s.stopOrder,
+              'location': s.location,
+              'latitude': s.latitude,
+              'longitude': s.longitude,
+            }).toList(),
+        'passengerCount': currentRide.value!.passengerCount,
+        'payment': 'Successful',
+        'tip': tip,
+      };
+
+      print('💰 SAHAr Creating new ride assignment with payment info');
+
+      currentRide.value = RideAssignment.fromJson(updatedRideData);
+      paymentCompleted.value = true;
+      isWaitingForPayment.value = false;
+      showPaymentDialog.value = false;
+
+      print('💰 SAHAr ✅ Ride updated successfully!');
+      print('   - Payment: ${currentRide.value!.payment}');
+      print('   - Tip: \$${currentRide.value!.tip?.toStringAsFixed(2) ?? "0.00"}');
+      print('   - FareFinal: \$${currentRide.value!.fareFinal.toStringAsFixed(2)}');
+
+      _clearAllUIBeforePaymentPopup();
+
+      Future.delayed(const Duration(milliseconds: 300), () {
+        showPaymentSuccessPopup(
+          fareFinal: currentRide.value!.fareFinal,
+          tip: currentRide.value!.tip ?? 0,
+        );
+      });
+
+      print('💰 SAHAr Payment popup scheduled');
+    } catch (e) {
+      print('❌ SAHAr Error parsing payment: $e');
+      print('❌ SAHAr Stack trace: ${StackTrace.current}');
+    }
+  }
+
+  /// Background isolate forwards `RideStatusUpdate` via [FlutterBackgroundService];
+  /// the UI bridge must call this so the waiting-for-payment sheet can close.
+  void onRideStatusUpdateFromBackground(Map<String, dynamic> data) {
+    _handleRideStatusUpdate(data);
+  }
+
+  /// Background isolate forwards `PaymentCompleted` the same way.
+  void onPaymentCompletedFromBackground(Map<String, dynamic> paymentData) {
+    _handlePaymentCompletedPayload(paymentData);
+  }
+
   /// Set up all SignalR event handlers
   void _setupConnectionHandlers() {
     if (_hubConnection == null) {
@@ -932,81 +1051,7 @@ class BackgroundTrackingService extends GetxService {
           final paymentData = arguments[0] as Map<String, dynamic>;
           print('🚨 SAHAr [BG][SignalR] Parsed paymentData keys: ${paymentData.keys.toList()}');
           print('🚨 SAHAr [BG][SignalR] Full paymentData: $paymentData');
-          String rideId = paymentData['rideId']?.toString() ?? '';
-
-          print('💰 SAHAr Payment data received: $paymentData'); 
-
-          // Update the current ride with payment info
-          if (currentRide.value != null && currentRide.value!.rideId == rideId) {
-            // Parse tip value properly
-            double tip = 0.0;
-            if (paymentData['tip'] != null) {
-              if (paymentData['tip'] is int) {
-                tip = (paymentData['tip'] as int).toDouble();
-              } else if (paymentData['tip'] is double) {
-                tip = paymentData['tip'] as double;
-              } else {
-                tip = double.tryParse(paymentData['tip'].toString()) ?? 0.0;
-              }
-            }
-
-            print('💰 SAHAr Parsed tip: \$${tip.toStringAsFixed(2)}');
-
-            // Create updated ride data with payment info
-            final updatedRideData = {
-              'rideId': currentRide.value!.rideId,
-              'rideType': currentRide.value!.rideType,
-              'fareEstimate': currentRide.value!.fareEstimate,
-              'fareFinal': currentRide.value!.fareFinal,
-              'createdAt': currentRide.value!.createdAt.toIso8601String(),
-              'status': 'Completed',
-              'passengerId': currentRide.value!.passengerId,
-              'passengerName': currentRide.value!.passengerName,
-              'passengerPhone': currentRide.value!.passengerPhone,
-              'pickupLocation': currentRide.value!.pickupLocation,
-              'pickUpLat': currentRide.value!.pickUpLat,
-              'pickUpLon': currentRide.value!.pickUpLon,
-              'dropoffLocation': currentRide.value!.dropoffLocation,
-              'dropoffLat': currentRide.value!.dropoffLat,
-              'dropoffLon': currentRide.value!.dropoffLon,
-              'stops': currentRide.value!.stops.map((s) => {
-                'stopOrder': s.stopOrder,
-                'location': s.location,
-                'latitude': s.latitude,
-                'longitude': s.longitude,
-              }).toList(),
-              'passengerCount': currentRide.value!.passengerCount,
-              'payment': 'Successful',
-              'tip': tip,
-            };
-
-            print('💰 SAHAr Creating new ride assignment with payment info');
-
-            // Update ride with payment info
-            currentRide.value = RideAssignment.fromJson(updatedRideData);
-            paymentCompleted.value = true;
-            isWaitingForPayment.value = false;
-
-            print('💰 SAHAr ✅ Ride updated successfully!');
-            print('   - Payment: ${currentRide.value!.payment}');
-            print('   - Tip: \$${currentRide.value!.tip?.toStringAsFixed(2) ?? "0.00"}');
-            print('   - FareFinal: \$${currentRide.value!.fareFinal.toStringAsFixed(2)}');
-
-            // Clear all UI elements before showing payment popup
-            _clearAllUIBeforePaymentPopup();
-
-            // Show payment success popup after clearing UI
-            Future.delayed(const Duration(milliseconds: 300), () {
-              showPaymentSuccessPopup(
-                fareFinal: currentRide.value!.fareFinal,
-                tip: currentRide.value!.tip ?? 0,
-              );
-            });
-
-            print('💰 SAHAr Payment popup shown');
-          } else {
-            print('⚠️ SAHAr Cannot update payment - no current ride or ride ID mismatch');
-          }
+          _handlePaymentCompletedPayload(paymentData);
         } catch (e) {
           print('❌ SAHAr Error parsing payment: $e');
           print('❌ SAHAr Stack trace: ${StackTrace.current}');
@@ -1312,7 +1357,7 @@ class BackgroundTrackingService extends GetxService {
   void _handleNewRideAssignment(Map<String, dynamic> rideData) {
     try {
       // ✅ CHECK: If this is a "Payment Received" status, handle it specially
-      if (rideData['status'] == 'Payment Received') {
+      if (_statusMeansPaymentReceived(rideData['status'])) {
         print('💰💰💰 SAHAr PAYMENT RECEIVED in NewRideAssigned!');
 
         // Get current ride data for payment info
@@ -1355,10 +1400,11 @@ class BackgroundTrackingService extends GetxService {
         paymentCompleted.value = true;
         isWaitingForPayment.value = false;
 
-        // Close any open dialogs/bottom sheets
+        // Close waiting-for-payment bottom sheet if shown
         if (showPaymentDialog.value || Get.isBottomSheetOpen == true) {
           Get.back();
         }
+        showPaymentDialog.value = false;
 
         // Clear all UI elements before showing payment popup
         _clearAllUIBeforePaymentPopup();
@@ -1376,6 +1422,24 @@ class BackgroundTrackingService extends GetxService {
 
       // ✅ Regular ride assignment processing
       final ride = RideAssignment.fromJson(rideData);
+      final incomingId = ride.rideId;
+      final completedReplay =
+          ride.status.trim().toLowerCase() == 'completed';
+
+      if (incomingId.isNotEmpty &&
+          _rideIdPaymentFlowDismissed != null &&
+          incomingId != _rideIdPaymentFlowDismissed) {
+        _rideIdPaymentFlowDismissed = null;
+      }
+
+      if (incomingId.isNotEmpty &&
+          completedReplay &&
+          incomingId == _rideIdPaymentFlowDismissed) {
+        print(
+            '⏭️ SAHAr Ignoring replay NewRideAssigned — payment flow already dismissed for ride $incomingId');
+        return;
+      }
+
       currentRide.value = ride;
       rideStatus.value = ride.status;
       currentRideId.value = ride.rideId;
@@ -1401,8 +1465,18 @@ class BackgroundTrackingService extends GetxService {
       print('🔄 SAHAr Status update received:');
       print('   - Raw status data: $statusData');
 
+      final replayId = statusData['rideId']?.toString() ?? '';
+      final replayStatus = statusData['status']?.toString() ?? '';
+      if (replayId.isNotEmpty &&
+          replayStatus.trim().toLowerCase() == 'completed' &&
+          replayId == _rideIdPaymentFlowDismissed) {
+        print(
+            '⏭️ SAHAr Ignoring RideStatusUpdate replay — ride already dismissed: $replayId');
+        return;
+      }
+
       // Check for "Payment Received" status directly
-      if (statusData['status'] == 'Payment Received') {
+      if (_statusMeansPaymentReceived(statusData['status'])) {
         print('💰💰💰 SAHAr PAYMENT RECEIVED STATUS DETECTED!');
 
         // Get payment details from statusData
@@ -1439,10 +1513,11 @@ class BackgroundTrackingService extends GetxService {
         paymentCompleted.value = true;
         isWaitingForPayment.value = false;
 
-        // Close any open dialogs/bottom sheets
-        if (showPaymentDialog.value) {
+        // Close waiting-for-payment bottom sheet if shown
+        if (showPaymentDialog.value || Get.isBottomSheetOpen == true) {
           Get.back();
         }
+        showPaymentDialog.value = false;
 
         // Clear all UI elements before showing payment popup
         _clearAllUIBeforePaymentPopup();
@@ -1461,38 +1536,48 @@ class BackgroundTrackingService extends GetxService {
       // Regular status update processing
       final ride = RideAssignment.fromJson(statusData);
 
-      // Check if this is a payment completion update
       final wasWaitingForPayment = isWaitingForPayment.value;
-      final hasPaymentCompleted = ride.payment == 'Successful' && ride.status == 'Completed';
+      final completedTrip = ride.status.trim().toLowerCase() == 'completed';
+      final explicitPaid = ride.payment == 'Successful';
+      final hasPaymentCompleted = explicitPaid && completedTrip;
 
       print('   - Status: ${ride.status}');
       print('   - Payment: ${ride.payment}');
       print('   - Was waiting: $wasWaitingForPayment');
-      print('   - Payment completed: $hasPaymentCompleted');
+      print('   - Payment completed (explicit): $hasPaymentCompleted');
 
       // Update current ride
       currentRide.value = ride;
       rideStatus.value = ride.status;
       currentRideId.value = ride.rideId;
 
-      // If payment just completed while we were waiting
-      if (wasWaitingForPayment && hasPaymentCompleted && showPaymentDialog.value) {
-        print('💰 SAHAr Payment completed! Showing popup...');
+      // Completed while awaiting payment — server may omit `payment` until later
+      if (wasWaitingForPayment &&
+          showPaymentDialog.value &&
+          completedTrip &&
+          !paymentCompleted.value) {
+        if (explicitPaid) {
+          print('💰 SAHAr Payment completed! Showing popup...');
 
-        // Update payment flags
-        paymentCompleted.value = true;
-        isWaitingForPayment.value = false;
+          paymentCompleted.value = true;
+          isWaitingForPayment.value = false;
 
-        // Close the bottom sheet first
-        Get.back();
+          if (Get.isBottomSheetOpen == true) {
+            Get.back();
+          }
+          showPaymentDialog.value = false;
 
-        // Show payment success popup
-        showPaymentSuccessPopup(
-          fareFinal: ride.fareFinal,
-          tip: ride.tip ?? 0,
-        );
+          showPaymentSuccessPopup(
+            fareFinal: ride.fareFinal,
+            tip: ride.tip ?? 0,
+          );
 
-        return; // Don't update UI for ride status
+          return;
+        }
+
+        print('💰 SAHAr Completed status update without payment=Successful — scheduling success UI');
+        _schedulePaymentSuccessAfterCompletedPayload(ride);
+        return;
       }
       _updateUIForRideStatus(ride);
 
@@ -1765,7 +1850,67 @@ class BackgroundTrackingService extends GetxService {
     }
   }
 
+  /// Server sometimes sends `status: Completed` without `payment` — close waiting sheet and
+  /// show success after [delay] (driver-requested ~2–3s so the UI does not flash).
+  void _schedulePaymentSuccessAfterCompletedPayload(
+    RideAssignment ride, {
+    Duration delay = const Duration(milliseconds: 2500),
+  }) {
+    final fare = ride.fareFinal;
+    final tip = ride.tip ?? 0.0;
+    final id = ride.rideId;
+
+    print('💰 SAHAr Completed payload without payment=Successful — sheet closed, Payment Received in ${delay.inMilliseconds}ms');
+
+    paymentCompleted.value = true;
+    isWaitingForPayment.value = false;
+    showPaymentDialog.value = false;
+
+    if (Get.isBottomSheetOpen == true) {
+      Get.back();
+    }
+
+    currentRide.value = RideAssignment(
+      rideId: ride.rideId,
+      rideType: ride.rideType,
+      fareEstimate: ride.fareEstimate,
+      fareFinal: ride.fareFinal,
+      createdAt: ride.createdAt,
+      status: ride.status,
+      passengerId: ride.passengerId,
+      passengerName: ride.passengerName,
+      passengerPhone: ride.passengerPhone,
+      pickupLocation: ride.pickupLocation,
+      pickUpLat: ride.pickUpLat,
+      pickUpLon: ride.pickUpLon,
+      dropoffLocation: ride.dropoffLocation,
+      dropoffLat: ride.dropoffLat,
+      dropoffLon: ride.dropoffLon,
+      stops: ride.stops,
+      passengerCount: ride.passengerCount,
+      payment: 'Successful',
+      tip: ride.tip,
+    );
+    rideStatus.value = ride.status;
+    currentRideId.value = ride.rideId;
+
+    _clearAllUIBeforePaymentPopup();
+
+    Future.delayed(delay, () {
+      if (currentRide.value?.rideId != id) return;
+      showPaymentSuccessPopup(fareFinal: fare, tip: tip);
+    });
+  }
+
   void _showCompletedRide(RideAssignment ride) {
+    if (ride.rideId.isNotEmpty &&
+        ride.rideId == _rideIdPaymentFlowDismissed &&
+        ride.status.trim().toLowerCase() == 'completed') {
+      print(
+          '⏭️ SAHAr Skip _showCompletedRide — payment flow already dismissed for ${ride.rideId}');
+      return;
+    }
+
     // ✅ Clear route using MapService
     if (Get.isRegistered<MapService>()) {
       MapService.to.polylines.clear();
@@ -1777,6 +1922,23 @@ class BackgroundTrackingService extends GetxService {
 
     // Check if payment is already successful (in case we receive Completed with payment in one go)
     final hasPayment = ride.payment == 'Successful';
+    final statusLower = ride.status.trim().toLowerCase();
+    final isCompletedStatus = statusLower == 'completed';
+
+    // Full `NewRideAssigned` often omits `payment` even when the trip is done — we're still on
+    // "Awaiting Payment" → treat as success and dismiss the sheet.
+    final sameRideAsUi = currentRide.value?.rideId == ride.rideId || currentRide.value == null;
+    final awaitingPaymentUi =
+        showPaymentDialog.value || isWaitingForPayment.value;
+
+    if (isCompletedStatus &&
+        !hasPayment &&
+        awaitingPaymentUi &&
+        !paymentCompleted.value &&
+        sameRideAsUi) {
+      _schedulePaymentSuccessAfterCompletedPayload(ride);
+      return;
+    }
 
     if (hasPayment) {
       // Payment already completed, show popup directly
@@ -1843,6 +2005,8 @@ class BackgroundTrackingService extends GetxService {
 
     _isResetting = true;
 
+    final rideIdBeingCleared = currentRide.value?.rideId;
+
     currentRide.value = null;
     rideStatus.value = 'Online'; // ✅ Changed from 'No Active Ride' to 'Online' for Uber-like experience
 
@@ -1856,6 +2020,11 @@ class BackgroundTrackingService extends GetxService {
     isWaitingForPayment.value = false;
     paymentCompleted.value = false;
     showPaymentDialog.value = false;
+    _rideIdShownPaymentSuccessDialog = null;
+
+    if (rideIdBeingCleared != null && rideIdBeingCleared.isNotEmpty) {
+      _rideIdPaymentFlowDismissed = rideIdBeingCleared;
+    }
 
     // ✅ Animate camera back to driver's current position with bearing reset to North (0)
     if (lastSentLocation.value != null && Get.isRegistered<MapService>()) {

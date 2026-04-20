@@ -13,7 +13,7 @@ import 'package:signalr_netcore/signalr_client.dart';
 // ============================================================
 // This file contains the background isolate logic for:
 //   1. SignalR connection (with JWT auth)
-//   2. Location tracking (10m distance stream + 60s timer fallback)
+//   2. Location tracking (10m distance stream + 2min idle timer when hub connected)
 //   3. Forwarding SignalR events to the UI via service.invoke()
 //
 // IMPORTANT: This code runs in a SEPARATE ISOLATE.
@@ -26,7 +26,9 @@ import 'package:signalr_netcore/signalr_client.dart';
 const String _hubUrl = 'https://api.pickurides.com/ridechathub/';
 const String _emptyGuid = '00000000-0000-0000-0000-000000000000';
 const double _minimumDistanceMeters = 10.0;
-const int _timerFallbackSeconds = 60;
+/// When the driver stays within the distance filter, no stream events fire; ping the
+/// server on this interval so the rider still sees "online" location (only if SignalR is connected).
+const int _idleLocationHeartbeatSeconds = 120;
 
 /// Call this from main() BEFORE runApp()
 Future<void> initializeBackgroundService() async {
@@ -381,7 +383,7 @@ Future<void> onStart(ServiceInstance service) async {
   }
 
   // ══════════════════════════════════════════════════════════
-  // LOCATION TRACKING — 2 Conditions: 10m distance + 60s timer
+  // LOCATION TRACKING — stream on movement + 2min idle heartbeat (connected only)
   // ══════════════════════════════════════════════════════════
 
   // Condition 1: Distance-based stream (10 meter filter)
@@ -421,32 +423,45 @@ Future<void> onStart(ServiceInstance service) async {
     print('❌ SAHAr [BG-ISO] Error starting location stream: $e');
   }
 
-  // Condition 2: Timer fallback — every 60 seconds
+  // Condition 2: Idle heartbeat — if no location was sent for 2 minutes (driver not
+  // moving past the distance filter), send current fix while SignalR is connected.
+  // When the driver moves, Condition 1 updates lastSendTime so this does nothing.
+  // Tick more often than the idle window so we send soon after 2 minutes of no sends,
+  // not up to one whole extra period late.
   Timer timerFallback = Timer.periodic(
-    const Duration(seconds: _timerFallbackSeconds),
+    const Duration(seconds: 30),
     (timer) async {
       final secondsSinceLastSend = DateTime.now().difference(lastSendTime).inSeconds;
-      if (secondsSinceLastSend >= _timerFallbackSeconds) {
-        print('⏰ SAHAr [BG-ISO] Timer fallback: ${secondsSinceLastSend}s since last send, force-fetching location');
-        try {
-          final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high,
-          );
-          await _sendLocation(hubConnection!, driverId, driverName, currentRideId, position.latitude, position.longitude);
-          lastSendTime = DateTime.now();
+      if (secondsSinceLastSend < _idleLocationHeartbeatSeconds) {
+        return;
+      }
+      if (hubConnection == null || hubConnection!.state != HubConnectionState.Connected) {
+        print(
+          '⏰ SAHAr [BG-ISO] Idle location heartbeat skipped (${secondsSinceLastSend}s since last send) — hub not connected',
+        );
+        return;
+      }
+      print(
+        '⏰ SAHAr [BG-ISO] Idle location heartbeat: ${secondsSinceLastSend}s since last send, fetching location',
+      );
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+        await _sendLocation(hubConnection!, driverId, driverName, currentRideId, position.latitude, position.longitude);
+        lastSendTime = DateTime.now();
 
-          service.invoke('bg_LocationUpdate', {
-            'latitude': position.latitude,
-            'longitude': position.longitude,
-            'speed': position.speed,
-            'heading': position.heading,
-            'timestamp': position.timestamp.millisecondsSinceEpoch,
-          });
+        service.invoke('bg_LocationUpdate', {
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'speed': position.speed,
+          'heading': position.heading,
+          'timestamp': position.timestamp.millisecondsSinceEpoch,
+        });
 
-          print('✅ SAHAr [BG-ISO] Timer fallback location sent');
-        } catch (e) {
-          print('❌ SAHAr [BG-ISO] Timer fallback error: $e');
-        }
+        print('✅ SAHAr [BG-ISO] Idle heartbeat location sent');
+      } catch (e) {
+        print('❌ SAHAr [BG-ISO] Idle heartbeat error: $e');
       }
     },
   );
